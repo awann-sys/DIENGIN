@@ -1,0 +1,15 @@
+name: DIENGIN Scheduler Test
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/5 * * * *"
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Scheduler ping
+        run: |
+          echo "DIENGIN scheduler aktif"
+          date -u
