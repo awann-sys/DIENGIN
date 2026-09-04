@@ -3,10 +3,7 @@ name: DIENGIN Cloud Pipeline
 on:
   workflow_dispatch:
   schedule:
-    # 4x per hour = setiap 15 menit.
-    # Sengaja tidak memakai menit 00 untuk mengurangi risiko delay
-    # pada puncak beban GitHub Actions di awal jam.
-    - cron: "7,22,37,52 * * * *"
+    - cron: "8,23,38,53 * * * *"
       timezone: "Asia/Jakarta"
 
 permissions:
