@@ -3,8 +3,7 @@ name: DIENGIN Cloud Pipeline
 on:
   workflow_dispatch:
   schedule:
-    - cron: "8,23,38,53 * * * *"
-      timezone: "Asia/Jakarta"
+    - cron: "*/5 * * * *"
 
 permissions:
   contents: write
