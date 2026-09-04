@@ -105,7 +105,7 @@ jobs:
           mkdir -p /tmp/diengin-runtime/data/history
 
           cp app.py /tmp/diengin-runtime/
-          cp requirements_dashboard.txt /tmp/diengin-runtime/
+          cp requirements_dashboard.txt /tmp/diengin-runtime/requirements.txt
 
           # Latest files untuk dashboard
           cp -f output/monitoring_latest.json /tmp/diengin-runtime/output/
