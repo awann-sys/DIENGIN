@@ -1,0 +1,174 @@
+name: DIENGIN Cloud Pipeline
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 4x per hour = setiap 15 menit.
+    # Sengaja tidak memakai menit 00 untuk mengurangi risiko delay
+    # pada puncak beban GitHub Actions di awal jam.
+    - cron: "7,22,37,52 * * * *"
+      timezone: "Asia/Jakarta"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: diengin-cloud-pipeline
+  cancel-in-progress: false
+
+jobs:
+  run-diengin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+
+    env:
+      TZ: Asia/Jakarta
+      AWS_API_USERNAME: ${{ secrets.AWS_API_USERNAME }}
+      AWS_API_PASSWORD: ${{ secrets.AWS_API_PASSWORD }}
+
+    steps:
+      - name: Checkout main/default branch
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: requirements_cloud.txt
+
+      - name: Restore cumulative history from runtime branch
+        shell: bash
+        run: |
+          set -e
+          mkdir -p data/history
+          git fetch origin runtime:refs/remotes/origin/runtime || true
+
+          for f in \
+            monitoring_history.csv \
+            prediction_release_history.csv \
+            prediction_night_history.csv
+          do
+            git show "origin/runtime:data/history/$f" > "data/history/$f" 2>/dev/null || true
+            if [ ! -s "data/history/$f" ]; then
+              rm -f "data/history/$f"
+            fi
+          done
+
+      - name: Install cloud dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements_cloud.txt
+
+      - name: Verify deployment files
+        shell: bash
+        run: |
+          set -e
+          test -f models/ann_model.keras
+          test -f models/svm_core.joblib
+          test -f models/svm_calibrator.joblib
+          test -f models/random_forest.joblib
+          test -f models/meta_probability_logistic_regression.joblib
+          test -f models/scaler.joblib
+          test -f models/deployment_config.json
+          echo "Deployment model files: OK"
+
+      - name: Run DIENGIN pipeline
+        run: python main.py
+
+      - name: Verify pipeline success
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          p = Path("output/pipeline_status.json")
+          if not p.exists():
+              raise SystemExit("pipeline_status.json tidak ditemukan")
+
+          data = json.loads(p.read_text(encoding="utf-8"))
+          if data.get("status") != "success":
+              raise SystemExit(f"Pipeline status bukan success: {data}")
+
+          print("Pipeline verification: SUCCESS")
+          PY
+
+      - name: Prepare runtime snapshot
+        shell: bash
+        run: |
+          set -e
+          rm -rf /tmp/diengin-runtime
+          mkdir -p /tmp/diengin-runtime/output
+          mkdir -p /tmp/diengin-runtime/data/history
+
+          cp app.py /tmp/diengin-runtime/
+          cp requirements_dashboard.txt /tmp/diengin-runtime/
+
+          # Latest files untuk dashboard
+          cp -f output/monitoring_latest.json /tmp/diengin-runtime/output/
+          cp -f output/prediction_latest.json /tmp/diengin-runtime/output/
+          cp -f output/pipeline_status.json /tmp/diengin-runtime/output/
+
+          # Optional audit/latest tables
+          for f in \
+            monitoring_snapshot_latest.csv \
+            prediction_releases_latest.csv \
+            prediction_night_summary.csv \
+            prediction_qc_audit.csv \
+            prediction_feature_snapshot_latest.csv \
+            history_status.json
+          do
+            if [ -f "output/$f" ]; then
+              cp -f "output/$f" /tmp/diengin-runtime/output/
+            fi
+          done
+
+          # Cumulative history
+          cp -f data/history/*.csv /tmp/diengin-runtime/data/history/ 2>/dev/null || true
+
+          cat > /tmp/diengin-runtime/RUNTIME_README.md <<'EOF'
+          # DIENGIN runtime branch
+
+          Branch ini dibuat otomatis oleh GitHub Actions.
+          Isinya adalah snapshot output terbaru dan history yang dibaca dashboard.
+
+          Jangan simpan credential/API secret di branch ini.
+          EOF
+
+      - name: Publish single-snapshot runtime branch
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Simpan snapshot di luar working tree, lalu buat orphan commit baru.
+          git checkout --orphan runtime-temp
+          git rm -rf . >/dev/null 2>&1 || true
+          find . -mindepth 1 -maxdepth 1 \
+            ! -name '.git' \
+            -exec rm -rf {} +
+
+          cp -a /tmp/diengin-runtime/. .
+
+          git add .
+          git commit -m "DIENGIN runtime update $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+
+          # Force push menjaga runtime sebagai satu snapshot commit,
+          # bukan menumpuk 96 commit per hari.
+          git push origin HEAD:runtime --force
+
+      - name: Summary
+        if: always()
+        shell: bash
+        run: |
+          echo "### DIENGIN Cloud Pipeline" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Schedule: 07, 22, 37, 52 menit setiap jam (Asia/Jakarta)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Runtime branch: runtime" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Pipeline status file: output/pipeline_status.json" >> "$GITHUB_STEP_SUMMARY"

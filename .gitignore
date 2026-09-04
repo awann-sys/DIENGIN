@@ -1,0 +1,24 @@
+# Virtual environments
+/.venv/
+/.venv_dashboard/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Credentials
+.env
+.env.*
+!.env.example
+
+# Data hasil runtime lokal
+/data/
+/logs/
+/output/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

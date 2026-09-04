@@ -1,0 +1,108 @@
+{
+  "architecture_version": "probability_only_grouped_oof_one_release_16_features_v4",
+  "feature_cols": [
+    "tmin_now",
+    "tmin_min_1h",
+    "temp_drop_1h",
+    "tmin_anom_month",
+    "rh_mean_1h",
+    "dp_depress",
+    "dpdep_anom_month",
+    "ws_mean_1h",
+    "ws_max_1h",
+    "rr_10min",
+    "rr_sum_3h",
+    "is_rain_now",
+    "doy_sin",
+    "doy_cos",
+    "hour_sin",
+    "hour_cos"
+  ],
+  "train_median": {
+    "tmin_now": 12.9,
+    "tmin_min_1h": 12.78,
+    "temp_drop_1h": 0.10000000000000142,
+    "tmin_anom_month": 0.0,
+    "rh_mean_1h": 98.09999999999998,
+    "dp_depress": 0.29676475041097206,
+    "dpdep_anom_month": 0.0,
+    "ws_mean_1h": 1.1599999999999988,
+    "ws_max_1h": 1.8,
+    "rr_10min": 0.0,
+    "rr_sum_3h": 0.0,
+    "is_rain_now": 0.0,
+    "doy_sin": -0.09233133369539122,
+    "doy_cos": -0.05695101102736663,
+    "hour_sin": 0.2376293295203118,
+    "hour_cos": 0.7071067811865475
+  },
+  "monthly_anomaly_reference": {
+    "tt_air_min_monthly_median_train": {
+      "1": 13.7,
+      "2": 13.67,
+      "3": 13.43,
+      "4": 13.0,
+      "5": 12.4,
+      "6": 12.11,
+      "7": 10.2,
+      "8": 10.1,
+      "9": 12.37,
+      "10": 13.11,
+      "11": 13.35,
+      "12": 13.09
+    },
+    "dp_depress_monthly_median_train": {
+      "1": 0.31026017510866843,
+      "2": 0.3881510247103783,
+      "3": 0.2134073667657077,
+      "4": 0.15357532828395115,
+      "5": 0.060708293937030255,
+      "6": 0.0742358946985,
+      "7": 0.2565825907328141,
+      "8": 0.4927236885586961,
+      "9": 0.9480263696403508,
+      "10": 0.5141705959238907,
+      "11": 0.3433900185128538,
+      "12": 0.27772571561666837
+    }
+  },
+  "rr_mode": "cumulative",
+  "qc_limits": {
+    "rh_min": 0.0,
+    "rh_max": 110.0,
+    "ws_min": 0.0,
+    "tavg_min": -10.0,
+    "tavg_max": 40.0,
+    "tmin_min": -10.0,
+    "tmin_max": 40.0,
+    "td_min": -20.0,
+    "td_max": 30.0
+  },
+  "release_hours_wib": [
+    21,
+    22,
+    23,
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "train_night_climatology": 0.025458248472505093,
+  "night_min_pod": 0.75,
+  "night_categorical_aggregation": "one_release_max_probability",
+  "frozen_night_thresholds": {
+    "ANN": 0.9190845489501953,
+    "SVM": 0.07914599804344076,
+    "RF": 0.2733333333333333,
+    "Stacked Ensemble": 0.2969953759055436
+  },
+  "base_probability_order": [
+    "ann_prob",
+    "svm_prob",
+    "rf_prob"
+  ]
+}

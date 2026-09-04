@@ -1,0 +1,8 @@
+{
+  "n_test_rows": 500,
+  "max_abs_diff_ann": 0.0,
+  "max_abs_diff_svm": 0.0,
+  "max_abs_diff_rf": 0.0,
+  "max_abs_diff_stacked": 0.0,
+  "passed": true
+}

@@ -1,0 +1,62 @@
+{
+  "project": "DIENGIN",
+  "package_version": "1.1",
+  "deployment_type": "portable",
+  "feature_count": 16,
+  "release_hours_wib": [
+    21,
+    22,
+    23,
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "scaler_parity_max_abs_diff": 0.0,
+  "artifacts": {
+    "ann_model.keras": {
+      "sha256": "f80abd76f90c70fbc9ec4152d8847a47df302bd687eb1fbf52c664ee90e470ad",
+      "size_bytes": 29233
+    },
+    "architecture_checks.csv": {
+      "sha256": "1f5ecb21d39caa6d6385985c6fbb8f4855d4192f845ea3ecf0a37d1195735681",
+      "size_bytes": 535
+    },
+    "deployment_config.json": {
+      "sha256": "1f84786658d776cf2b8d26ea3aa08f4e867a0d060eef3c92e9f080366104dca3",
+      "size_bytes": 2488
+    },
+    "deployment_verification.json": {
+      "sha256": "2cd9616498bbb6948c132356cbfa1765bd88aacb5d967625fcc0c8ded93ab673",
+      "size_bytes": 160
+    },
+    "meta_probability_logistic_regression.joblib": {
+      "sha256": "af1317f1f2a5b81c3268e323d5f5ff2072d00138c7114512690840929c07c5cc",
+      "size_bytes": 1179
+    },
+    "random_forest.joblib": {
+      "sha256": "cf32c72fcb19845f5b02aa02c50a22e171c49f2332ad3d305ae250c4d022533d",
+      "size_bytes": 19791161
+    },
+    "requirements_model.txt": {
+      "sha256": "e0dfad4e9cc4db1f9020ca693daa9bb190ded4dc30efab205c3334a29a4baf0d",
+      "size_bytes": 85
+    },
+    "scaler.joblib": {
+      "sha256": "f8c1c250d8a7b13cd94f4ba3253ae75aebc29d6fbecd72420246f75ec07dd707",
+      "size_bytes": 1415
+    },
+    "svm_calibrator.joblib": {
+      "sha256": "86d2004570179e8848f6e986b4011426bb8da7ae27fe6c1395a1420adb6120ec",
+      "size_bytes": 875
+    },
+    "svm_core.joblib": {
+      "sha256": "0bcf309d48b26d099fd281ad37f7aea43e8a294f976ec47d0d014692b97a6aaa",
+      "size_bytes": 1258779
+    }
+  }
+}

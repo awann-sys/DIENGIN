@@ -1,0 +1,16 @@
+check,passed
+probability_only_stacking,True
+no_class_meta_learner,True
+meta_class_weight_none,True
+oof_grouped_by_night,True
+svm_calibration_grouped_by_night,True
+ann_internal_validation_grouped_by_night,True
+ann_internal_validation_six_runs,True
+ann_internal_validation_zero_overlap,True
+release_uses_past_observation,True
+night_maximum_scores_available,True
+night_one_release_thresholds_available,True
+threshold_selected_from_validation,True
+training_years_end_2023,True
+validation_year_2024,True
+test_year_2025,True
