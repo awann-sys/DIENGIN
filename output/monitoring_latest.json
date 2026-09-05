@@ -1,0 +1,101 @@
+{
+  "status": "success",
+  "generated_at_wib": "2026-09-06T06:31:11.949513+07:00",
+  "monitoring_status": "valid",
+  "station": {
+    "station_id": "STA2285",
+    "station_name": "AWS Batur Dieng",
+    "latitude": -7.20399,
+    "longitude": 109.91158,
+    "elevation_m": 2078.0,
+    "city": "Kab. Banjarnegara"
+  },
+  "latest_observation": {
+    "time_wib": "2026-09-06T06:20:00+07:00",
+    "data_age_minutes": 11.19915855,
+    "freshness_status": "current",
+    "parameters": {
+      "tt_air_avg": 6.33,
+      "tt_air_min": 3.49,
+      "rh_avg": 97.0,
+      "ws_avg": 0.176,
+      "wd_avg": 158.5,
+      "rr": 0.0,
+      "pp_air": 799.463,
+      "dew_point_c": 5.888601633280289
+    },
+    "source_values": {
+      "rh_avg_source": 97.0
+    },
+    "operational_adapter": {
+      "rh_adapter_invalid": false,
+      "rh_policy": "RH tidak dipakai oleh pipeline DIENGIN bila rh_avg_flag=1, RH<5%, atau RH>110%. Nilai sumber tetap disimpan terpisah."
+    },
+    "source_quality_flags": {
+      "tt_air_avg_flag": null,
+      "tt_air_min_flag": null,
+      "rh_avg_flag": null,
+      "ws_avg_flag": null,
+      "wd_avg_flag": null,
+      "rr_flag": null,
+      "pp_air_flag": null
+    },
+    "model_qc": {
+      "tt_air_avg": {
+        "value": 6.33,
+        "qc_status": "valid",
+        "qc_min": -10.0,
+        "qc_max": 40.0
+      },
+      "tt_air_min": {
+        "value": 3.49,
+        "qc_status": "valid",
+        "qc_min": -10.0,
+        "qc_max": 40.0
+      },
+      "rh_avg": {
+        "value": 97.0,
+        "qc_status": "valid",
+        "qc_min": 0.0,
+        "qc_max": 110.0
+      },
+      "ws_avg": {
+        "value": 0.176,
+        "qc_status": "valid",
+        "qc_min": 0.0,
+        "qc_max": null
+      },
+      "dew_point_c": {
+        "value": 5.888601633280289,
+        "qc_status": "valid",
+        "qc_min": -20.0,
+        "qc_max": 30.0
+      }
+    }
+  },
+  "trend_1h": {
+    "reference_available": true,
+    "reference_time_wib": "2026-09-06T05:20:00+07:00",
+    "reference_age_from_latest_minutes": 60.0,
+    "tt_air_avg_change": 0.6989999999999998,
+    "tt_air_min_change": 0.0,
+    "rh_avg_change": 0.0,
+    "ws_avg_change": 0.176,
+    "pp_air_change": 0.5205999999999449
+  },
+  "recent_1h": {
+    "window_start_wib": "2026-09-06T05:20:00+07:00",
+    "window_end_wib": "2026-09-06T06:20:00+07:00",
+    "observation_count": 6,
+    "median_interval_minutes": 10.0,
+    "maximum_interval_minutes": 10.0,
+    "tmin_min_1h": 3.49,
+    "rh_mean_1h": 97.0,
+    "ws_mean_1h": 0.029333333333333333,
+    "ws_max_1h": 0.176
+  },
+  "notes": {
+    "source_flag_policy": "Quality flag API tetap disimpan apa adanya. Khusus rh_avg_flag=1, pipeline mengikuti adapter operasional DIENGIN yang juga digunakan predict.py; ini bukan klaim mengenai legenda resmi flag BMKG.",
+    "prediction_policy": "Monitoring tidak mengubah model, threshold, atau jam rilis prediksi."
+  }
+}

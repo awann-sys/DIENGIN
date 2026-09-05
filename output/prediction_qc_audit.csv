@@ -1,0 +1,12 @@
+pemeriksaan,nilai
+jumlah_baris_input,142.0
+waktu_tidak_valid,0.0
+waktu_duplikat_dihapus,0.0
+rh_adapter_tidak_valid,34.0
+jumlah_jeda_lebih_10_menit,0.0
+jeda_maksimum_menit,10.0
+qc_model_invalid_rh_range,0.0
+qc_model_invalid_ws_negative,0.0
+qc_model_invalid_tavg_range,0.0
+qc_model_invalid_tmin_range,0.0
+qc_model_invalid_td_range,3.0
