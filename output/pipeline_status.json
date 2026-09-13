@@ -1,0 +1,40 @@
+{
+  "status": "success",
+  "started_at_wib": "2026-09-13T10:46:25.032545+07:00",
+  "finished_at_wib": "2026-09-13T10:46:45.597706+07:00",
+  "python_executable": "/opt/hostedtoolcache/Python/3.11.16/x64/bin/python",
+  "stages": [
+    {
+      "name": "download",
+      "script": "/home/runner/work/DIENGIN/DIENGIN/src/download_aws.py",
+      "status": "success",
+      "returncode": 0,
+      "started_at_wib": "2026-09-13T10:46:25.032764+07:00",
+      "finished_at_wib": "2026-09-13T10:46:40.346707+07:00"
+    },
+    {
+      "name": "monitoring",
+      "script": "/home/runner/work/DIENGIN/DIENGIN/src/monitoring.py",
+      "status": "success",
+      "returncode": 0,
+      "started_at_wib": "2026-09-13T10:46:40.347006+07:00",
+      "finished_at_wib": "2026-09-13T10:46:40.709697+07:00"
+    },
+    {
+      "name": "prediction",
+      "script": "/home/runner/work/DIENGIN/DIENGIN/src/predict.py",
+      "status": "success",
+      "returncode": 0,
+      "started_at_wib": "2026-09-13T10:46:40.709995+07:00",
+      "finished_at_wib": "2026-09-13T10:46:45.220777+07:00"
+    },
+    {
+      "name": "history",
+      "script": "/home/runner/work/DIENGIN/DIENGIN/src/history.py",
+      "status": "success",
+      "returncode": 0,
+      "started_at_wib": "2026-09-13T10:46:45.221126+07:00",
+      "finished_at_wib": "2026-09-13T10:46:45.597396+07:00"
+    }
+  ]
+}

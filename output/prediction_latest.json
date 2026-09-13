@@ -1,0 +1,75 @@
+{
+  "status": "success",
+  "architecture_version": "probability_only_grouped_oof_one_release_16_features_v4",
+  "generated_at_wib": "2026-09-13T10:46:44.094949+07:00",
+  "target_night_date": "2026-09-13",
+  "latest_observation_wib": "2026-09-13T06:50:00+07:00",
+  "data_age_minutes": 236.73491581666667,
+  "data_status": "stale",
+  "threshold_stacked": 0.2969953759055436,
+  "releases_expected": 11,
+  "releases_available": 11,
+  "night_complete": true,
+  "probability_max_so_far": 0.005959373063841465,
+  "probability_max_hour_wib": 2,
+  "first_threshold_exceed_hour_wib": null,
+  "prediction_so_far": 0,
+  "next_release_wib": null,
+  "qc": [
+    {
+      "pemeriksaan": "jumlah_baris_input",
+      "nilai": 143
+    },
+    {
+      "pemeriksaan": "waktu_tidak_valid",
+      "nilai": 0
+    },
+    {
+      "pemeriksaan": "waktu_duplikat_dihapus",
+      "nilai": 0
+    },
+    {
+      "pemeriksaan": "rh_adapter_tidak_valid",
+      "nilai": 51
+    },
+    {
+      "pemeriksaan": "jumlah_jeda_lebih_10_menit",
+      "nilai": 0
+    },
+    {
+      "pemeriksaan": "jeda_maksimum_menit",
+      "nilai": 10.0
+    },
+    {
+      "pemeriksaan": "qc_model_invalid_rh_range",
+      "nilai": 0
+    },
+    {
+      "pemeriksaan": "qc_model_invalid_ws_negative",
+      "nilai": 0
+    },
+    {
+      "pemeriksaan": "qc_model_invalid_tavg_range",
+      "nilai": 0
+    },
+    {
+      "pemeriksaan": "qc_model_invalid_tmin_range",
+      "nilai": 0
+    },
+    {
+      "pemeriksaan": "qc_model_invalid_td_range",
+      "nilai": 0
+    }
+  ],
+  "latest_release": {
+    "hour_wib": 7,
+    "release_time_wib": "2026-09-13T07:00:00+07:00",
+    "observation_used_wib": "2026-09-13T06:50:00+07:00",
+    "information_delay_minutes": 10.0,
+    "ann_probability": 0.042079657316207886,
+    "svm_probability": 0.023721552871803067,
+    "rf_probability": 0.0,
+    "stacked_probability": 0.0038592426919186206,
+    "threshold_exceeded": false
+  }
+}
