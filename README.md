@@ -42,3 +42,13 @@ Screenshot gelap/terang tersedia dalam artifact `diengin-ui-review`.
 Seluruh data pada screenshot pengujian adalah simulasi di direktori sementara.
 
 DIENGIN merupakan prototipe penelitian, bukan peringatan resmi BMKG.
+
+## Pratinjau UI
+
+Screenshot memakai data simulasi pengujian, bukan observasi cuaca aktual.
+
+![Pratinjau desktop](docs/ui-preview/desktop.jpg)
+
+[Lihat pratinjau HP](docs/ui-preview/mobile.jpg)
+
+[Pemeriksaan yang berhasil](https://github.com/awann-sys/DIENGIN/actions/runs/34876449713)
