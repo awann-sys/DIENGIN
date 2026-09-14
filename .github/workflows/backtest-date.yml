@@ -1,0 +1,73 @@
+name: DIENGIN Historical Backtest
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_date:
+        description: "Target frost morning (YYYY-MM-DD)"
+        required: true
+        default: "2026-08-23"
+  push:
+    branches: [main]
+    paths:
+      - "src/backtest_date.py"
+      - ".github/workflows/backtest-date.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TZ: Asia/Jakarta
+      AWS_API_USERNAME: ${{ secrets.AWS_API_USERNAME }}
+      AWS_API_PASSWORD: ${{ secrets.AWS_API_PASSWORD }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: requirements_cloud.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements_cloud.txt
+
+      - name: Run historical backtest
+        shell: bash
+        run: |
+          TARGET="${{ github.event.inputs.target_date }}"
+          if [ -z "$TARGET" ]; then TARGET="2026-08-23"; fi
+          echo "Backtest target: $TARGET"
+          BACKTEST_TARGET_DATE="$TARGET" python src/backtest_date.py
+
+      - name: Show result
+        if: always()
+        shell: bash
+        run: |
+          find output -path '*/backtest_*/*' -maxdepth 3 -type f -print 2>/dev/null || true
+          for f in output/backtest_*/result.json; do
+            if [ -f "$f" ]; then
+              echo "===== $f ====="
+              cat "$f"
+            fi
+          done
+
+      - name: Upload backtest result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: diengin-backtest-${{ github.event.inputs.target_date || '2026-08-23' }}
+          path: |
+            output/backtest_*/
+            data/backtest/*.csv
+          if-no-files-found: warn
+          retention-days: 14
