@@ -18,6 +18,7 @@ artifacts.mkdir(exist_ok=True)
 with tempfile.TemporaryDirectory() as tmp:
     work = Path(tmp)
     shutil.copyfile(ROOT / "app.py", work / "app.py")
+    shutil.copyfile(ROOT / "app_base.py", work / "app_base.py")
     write_fixture(work)
     for theme, port in [("dark", 8501), ("light", 8502)]:
         proc = subprocess.Popen(
@@ -63,10 +64,17 @@ with tempfile.TemporaryDirectory() as tmp:
                     assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 2"), "Horizontal page overflow"
                     brand_bounds = page.locator(".dg-brand").bounding_box()
                     assert brand_bounds and brand_bounds["y"] >= 55, "Brand overlapped by Streamlit toolbar"
-                    # Primary weather values must be visible near the top on desktop.
                     if device == "desktop":
                         bounds = page.get_by_text("Suhu udara", exact=True).first.bounding_box()
                         assert bounds and bounds["y"] < 500, bounds
+                        left_title = page.get_by_text("Jejak cuaca", exact=True).bounding_box()
+                        right_title = page.get_by_text("Perjalanan prediksi", exact=True).bounding_box()
+                        assert left_title and right_title
+                        assert abs(left_title["y"] - right_title["y"]) <= 3, (left_title, right_title)
+                        left_select = page.locator('[data-testid="stSelectbox"]').nth(0).bounding_box()
+                        right_select = page.locator('[data-testid="stSelectbox"]').nth(1).bounding_box()
+                        assert left_select and right_select
+                        assert abs(left_select["y"] - right_select["y"]) <= 4, (left_select, right_select)
                     page.get_by_role("tab", name="Eksplorasi data").click()
                     page.get_by_text("Eksplorasi observasi", exact=True).wait_for()
                     with page.expect_download() as download:
