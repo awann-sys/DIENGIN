@@ -1,4 +1,6 @@
 """Capture desktop/mobile views and verify basic browser behavior."""
+import base64
+import io
 import shutil
 import subprocess
 import sys
@@ -6,6 +8,7 @@ import tempfile
 import time
 import urllib.request
 from pathlib import Path
+from PIL import Image
 from playwright.sync_api import sync_playwright
 from test_dashboard import write_fixture
 
@@ -39,10 +42,21 @@ with tempfile.TemporaryDirectory() as tmp:
                     page = context.new_page()
                     errors = []
                     page.on("pageerror", lambda error: errors.append(str(error)))
+                    page.on("console", lambda message: print("BROWSER_CONSOLE:", message.type, message.text, flush=True) if message.type == "error" else None)
                     page.goto(f"http://localhost:{port}", wait_until="networkidle")
                     page.get_by_text("Terindikasi embun beku", exact=True).wait_for(timeout=60000)
-                    page.locator('[data-testid="stVegaLiteChart"]').first.wait_for(timeout=30000)
+                    try:
+                        page.locator('[data-testid="stVegaLiteChart"]').first.wait_for(timeout=10000)
+                    except Exception:
+                        print("CHART_ERRORS:", errors, flush=True)
                     page.screenshot(path=str(artifacts / f"{theme}-{device}.png"), full_page=True)
+                    if theme == "dark":
+                        preview = Image.open(artifacts / f"{theme}-{device}.png").convert("RGB")
+                        preview.thumbnail((1280, 1500))
+                        buffer = io.BytesIO()
+                        preview.save(buffer, format="JPEG", quality=70)
+                        print(f"UI_PREVIEW:{device}:" + base64.b64encode(buffer.getvalue()).decode(), flush=True)
+                    assert page.locator('[data-testid="stVegaLiteChart"]').first.is_visible(), "Chart did not render"
                     assert page.locator('[data-testid="stException"]').count() == 0
                     assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 2"), "Horizontal page overflow"
                     # Primary weather values must be visible near the top on desktop.

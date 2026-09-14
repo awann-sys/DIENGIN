@@ -8,6 +8,10 @@ on:
     paths: [app.py, requirements_dashboard.txt, tests/**, .github/workflows/dashboard-ui.yml]
   workflow_dispatch:
 
+concurrency:
+  group: dashboard-ui-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 

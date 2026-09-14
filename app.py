@@ -48,9 +48,10 @@ CSS = """
 .dg-pill { border-radius:50px; padding:.25rem .65rem; font-size:.71rem;
     display:inline-flex; align-items:center; gap:.35rem; border:1px solid rgba(128,128,128,.25); }
 .dg-dot { width:7px; height:7px; border-radius:50%; background:currentColor; display:inline-block; }
-.dg-fresh { color:#168b7c; background:rgba(34,184,167,.10); }
+.dg-fresh { color:inherit; background:rgba(34,184,167,.10); }
+.dg-fresh .dg-dot { background:#22b8a7; }
 .dg-old { color:inherit; background:rgba(232,173,88,.12); border-color:rgba(232,173,88,.5); }
-.dg-card { background:var(--secondary-background-color, #18212c);
+.dg-card { background:rgba(128,128,128,.055);
     border:1px solid rgba(128,128,128,.19); border-radius:16px; padding:1.1rem; }
 .dg-forecast { border-top:3px solid #22b8a7; min-height:264px; }
 .dg-forecast.alert { border-top-color:#e8ad58; }
