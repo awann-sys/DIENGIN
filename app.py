@@ -25,64 +25,80 @@ BMKG_CSS = """
     background: rgba(34,184,167,.08);
     border-color: rgba(34,184,167,.34);
     color: inherit;
+    font-size: .92rem;
+    font-weight: 600;
+    padding: .42rem .85rem;
 }
 .dg-bmkg-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: .75rem;
-    margin: .65rem 0 .8rem;
+    gap: .9rem;
+    margin: .75rem 0 .95rem;
 }
 .dg-bmkg-card {
     border: 1px solid rgba(128,128,128,.22);
-    border-radius: 13px;
-    padding: .9rem 1rem;
+    border-radius: 14px;
+    padding: 1rem 1.1rem;
     background: rgba(128,128,128,.045);
-    min-height: 142px;
+    min-height: 160px;
 }
 .dg-bmkg-time {
-    font-size: .76rem;
-    opacity: .66;
-    margin-bottom: .35rem;
+    font-size: .86rem;
+    font-weight: 500;
+    opacity: .7;
+    margin-bottom: .48rem;
 }
 .dg-bmkg-weather {
-    font-size: 1rem;
-    font-weight: 650;
-    line-height: 1.3;
-    min-height: 42px;
+    font-size: 1.2rem;
+    font-weight: 680;
+    line-height: 1.32;
+    min-height: 50px;
+    display: flex;
+    align-items: flex-start;
 }
 .dg-bmkg-weather .emoji {
-    font-size: 1.12rem;
-    margin-right: .3rem;
+    font-size: 1.55rem;
+    line-height: 1;
+    margin-right: .42rem;
+    flex-shrink: 0;
 }
 .dg-bmkg-temp {
-    font-size: 1.7rem;
-    font-weight: 680;
+    font-size: 2.2rem;
+    font-weight: 700;
+    line-height: 1.05;
     letter-spacing: -.03em;
-    margin: .4rem 0 .2rem;
+    margin: .56rem 0 .32rem;
 }
 .dg-bmkg-meta {
-    font-size: .76rem;
-    line-height: 1.45;
-    opacity: .72;
+    font-size: .88rem;
+    line-height: 1.55;
+    opacity: .8;
 }
 .dg-bmkg-hero {
     border-left: 3px solid #22b8a7;
     background: rgba(34,184,167,.065);
     border-radius: 0 12px 12px 0;
-    padding: .9rem 1rem;
-    margin: .45rem 0 .9rem;
+    padding: 1rem 1.08rem;
+    margin: .55rem 0 1rem;
+    font-size: .94rem;
+    line-height: 1.6;
 }
-.dg-bmkg-hero strong { font-size: 1.02rem; }
+.dg-bmkg-hero strong {
+    font-size: 1.18rem;
+}
 .dg-bmkg-source {
-    font-size: .76rem;
-    opacity: .68;
-    margin-top: .5rem;
+    font-size: .82rem;
+    opacity: .72;
+    margin-top: .65rem;
 }
 @media(max-width: 1000px) {
     .dg-bmkg-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media(max-width: 620px) {
     .dg-bmkg-grid { grid-template-columns: 1fr; }
+    .dg-bmkg-weather { font-size: 1.08rem; }
+    .dg-bmkg-weather .emoji { font-size: 1.4rem; }
+    .dg-bmkg-temp { font-size: 2rem; }
 }
 </style>
 """
@@ -256,7 +272,6 @@ def dashboard():
     mh = base.timed_frame(monitoring_history, "observation_time_wib")
     rh = base.timed_frame(release_history, "waktu_rilis_wib")
     latest = monitor.get("latest_observation") or {}
-    station = monitor.get("station") or {}
     fresh, fresh_text, age = base.freshness(latest.get("time_wib"), now)
 
     brand, refresh = st.columns([5.5, 1])
@@ -280,7 +295,6 @@ def dashboard():
     st.markdown(
         f'<div class="dg-strip">'
         f'<span class="dg-pill {pill}"><i class="dg-dot"></i>{base.esc(fresh_text)}</span>'
-        f'<span>{base.esc(station.get("station_name") or "Stasiun AWS")}</span>'
         f'<span class="dg-pill dg-bmkg-pill">🌦️ Prediksi BMKG</span>'
         f'<span class="dg-muted">{base.esc(base.time_label(latest.get("time_wib")))} · '
         f'{base.esc(base.age_label(age))}</span></div>',
