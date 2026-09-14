@@ -1,745 +1,381 @@
 #!/usr/bin/env python3
-"""
-DIENGIN - Dashboard v1
-Sistem Monitoring dan Prediksi Embun Beku Dieng
-
-Dashboard ini:
-- hanya membaca output pipeline;
-- tidak mengunduh data;
-- tidak menjalankan model;
-- tidak melakukan retraining.
-
-Jalankan:
-    streamlit run app.py
-"""
-
+"""DIENGIN dashboard entrypoint with BMKG public forecast integration."""
 from __future__ import annotations
 
 import json
-from pathlib import Path
+import urllib.error
+import urllib.request
 
-import numpy as np
 import pandas as pd
 import streamlit as st
 
+# Import UI refinement layer first; it patches app_base renderers/CSS.
+import app_ui  # noqa: F401
+import app_base as base
 
-# ============================================================
-# 0. KONFIGURASI
-# ============================================================
+BMKG_ADM4 = "33.04.16.2008"
+BMKG_API_URL = f"https://api.bmkg.go.id/publik/prakiraan-cuaca?adm4={BMKG_ADM4}"
 
-PROJECT_ROOT = Path(__file__).resolve().parent
-OUTPUT_DIR = PROJECT_ROOT / "output"
-HISTORY_DIR = PROJECT_ROOT / "data" / "history"
+BMKG_CSS = """
+<style>
+.dg-bmkg-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: .9rem;
+    margin: .75rem 0 .95rem;
+}
+.dg-bmkg-card {
+    border: 1px solid rgba(128,128,128,.22);
+    border-radius: 14px;
+    padding: 1rem 1.1rem;
+    background: rgba(128,128,128,.045);
+    min-height: 160px;
+}
+.dg-bmkg-time {
+    font-size: .86rem;
+    font-weight: 500;
+    opacity: .7;
+    margin-bottom: .48rem;
+}
+.dg-bmkg-weather {
+    font-size: 1.2rem;
+    font-weight: 680;
+    line-height: 1.32;
+    min-height: 50px;
+    display: flex;
+    align-items: flex-start;
+}
+.dg-bmkg-weather .emoji {
+    font-size: 1.55rem;
+    line-height: 1;
+    margin-right: .42rem;
+    flex-shrink: 0;
+}
+.dg-bmkg-temp {
+    font-size: 2.2rem;
+    font-weight: 700;
+    line-height: 1.05;
+    letter-spacing: -.03em;
+    margin: .56rem 0 .32rem;
+}
+.dg-bmkg-meta {
+    font-size: .88rem;
+    line-height: 1.55;
+    opacity: .8;
+}
+.dg-bmkg-hero {
+    border-left: 3px solid #22b8a7;
+    background: rgba(34,184,167,.065);
+    border-radius: 0 12px 12px 0;
+    padding: 1rem 1.08rem;
+    margin: .55rem 0 1rem;
+    font-size: .94rem;
+    line-height: 1.6;
+}
+.dg-bmkg-hero strong { font-size: 1.18rem; }
+.dg-bmkg-source {
+    font-size: .82rem;
+    opacity: .72;
+    margin-top: .65rem;
+}
+@media(max-width: 1000px) {
+    .dg-bmkg-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media(max-width: 620px) {
+    .dg-bmkg-grid { grid-template-columns: 1fr; }
+    .dg-bmkg-weather { font-size: 1.08rem; }
+    .dg-bmkg-weather .emoji { font-size: 1.4rem; }
+    .dg-bmkg-temp { font-size: 2rem; }
+}
+</style>
+"""
+base.CSS += BMKG_CSS
 
-MONITORING_JSON = OUTPUT_DIR / "monitoring_latest.json"
-PREDICTION_JSON = OUTPUT_DIR / "prediction_latest.json"
-PIPELINE_JSON = OUTPUT_DIR / "pipeline_status.json"
 
-MONITORING_HISTORY = HISTORY_DIR / "monitoring_history.csv"
-RELEASE_HISTORY = HISTORY_DIR / "prediction_release_history.csv"
-NIGHT_HISTORY = HISTORY_DIR / "prediction_night_history.csv"
-
-st.set_page_config(
-    page_title="DIENGIN",
-    page_icon="❄️",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
-
-
-# ============================================================
-# 1. STYLE
-# ============================================================
-
-st.markdown(
-    """
-    <style>
-    .block-container {
-        padding-top: 1.3rem;
-        padding-bottom: 2rem;
-    }
-
-    .diengin-subtitle {
-        color: rgba(120,120,120,0.95);
-        font-size: 0.95rem;
-        margin-top: -0.65rem;
-        margin-bottom: 1rem;
-    }
-
-    .status-box {
-        border: 1px solid rgba(128,128,128,0.25);
-        border-radius: 0.8rem;
-        padding: 0.8rem 1rem;
-        margin-bottom: 0.8rem;
-    }
-
-    .small-note {
-        font-size: 0.83rem;
-        color: rgba(120,120,120,0.95);
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+@st.cache_data(ttl=1800, show_spinner=False)
+def fetch_bmkg_forecast():
+    """Fetch official BMKG public forecast for Dieng Kulon."""
+    request = urllib.request.Request(
+        BMKG_API_URL,
+        headers={
+            "User-Agent": "DIENGIN/1.0 (+https://github.com/awann-sys/DIENGIN)",
+            "Accept": "application/json",
+        },
+    )
+    with urllib.request.urlopen(request, timeout=12) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("Respons BMKG bukan objek JSON.")
+    return payload
 
 
-# ============================================================
-# 2. HELPER
-# ============================================================
-
-def read_json(path: Path) -> dict | None:
-    if not path.is_file() or path.stat().st_size == 0:
-        return None
-
+def get_bmkg_forecast():
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
-        return None
+        return fetch_bmkg_forecast(), "ok"
+    except (
+        urllib.error.URLError,
+        urllib.error.HTTPError,
+        TimeoutError,
+        ValueError,
+        json.JSONDecodeError,
+        OSError,
+    ):
+        return {}, "error"
 
 
-def read_csv(path: Path) -> pd.DataFrame:
-    if not path.is_file() or path.stat().st_size == 0:
-        return pd.DataFrame()
-
-    try:
-        return pd.read_csv(path)
-    except Exception:
-        return pd.DataFrame()
-
-
-def fmt_float(value, decimals=2, suffix=""):
-    if value is None or pd.isna(value):
-        return "—"
-    return f"{float(value):.{decimals}f}{suffix}"
-
-
-def fmt_probability(value):
-    if value is None or pd.isna(value):
-        return "—"
-    return f"{float(value) * 100:.2f}%"
+def flatten_bmkg_rows(payload):
+    rows = []
+    for block in payload.get("data") or []:
+        if not isinstance(block, dict):
+            continue
+        for daily in block.get("cuaca") or []:
+            if isinstance(daily, list):
+                rows.extend(item for item in daily if isinstance(item, dict))
+    rows.sort(
+        key=lambda row: (
+            base.stamp(row.get("local_datetime"))
+            if not pd.isna(base.stamp(row.get("local_datetime")))
+            else pd.Timestamp.max.tz_localize(base.WIB)
+        )
+    )
+    return rows
 
 
-def parse_datetime(value):
-    if value in (None, "", "null"):
-        return pd.NaT
-    return pd.to_datetime(value, errors="coerce")
+def bmkg_weather_emoji(description):
+    text = str(description or "").lower()
+    if "petir" in text:
+        return "⛈️"
+    if "hujan" in text:
+        return "🌧️"
+    if "kabut" in text or "asap" in text:
+        return "🌫️"
+    if "berawan" in text:
+        return "☁️"
+    if "cerah" in text:
+        return "☀️"
+    return "🌤️"
 
 
-def fmt_wib(value, include_date=True):
-    dt = parse_datetime(value)
-    if pd.isna(dt):
-        return "—"
+def render_bmkg_forecast(now):
+    st.subheader("Prediksi BMKG · Dieng Kulon")
+    st.caption(
+        "Prakiraan cuaca resmi BMKG untuk ADM4 33.04.16.2008. "
+        "Data BMKG tersedia untuk 3 hari dengan interval prakiraan 3 jam."
+    )
 
-    if include_date:
-        return dt.strftime("%d %b %Y, %H:%M WIB")
-    return dt.strftime("%H:%M WIB")
+    payload, status = get_bmkg_forecast()
+    if status != "ok":
+        st.warning(
+            "Data prakiraan BMKG sedang tidak dapat diambil. "
+            "Coba gunakan tombol Segarkan beberapa saat lagi."
+        )
+        st.caption("Sumber data: BMKG · API Prakiraan Cuaca Terbuka")
+        return
 
+    location = payload.get("lokasi") or {}
+    rows = flatten_bmkg_rows(payload)
+    if not rows:
+        st.info("Respons BMKG diterima, tetapi detail prakiraan belum tersedia.")
+        return
 
-def normalize_status(value):
-    if value is None:
-        return "unknown"
-    return str(value).strip().lower()
+    village = location.get("desa") or "Dieng Kulon"
+    district = location.get("kecamatan") or "—"
+    regency = location.get("kotkab") or "—"
+    province = location.get("provinsi") or "—"
+    st.caption(f"{village} · {district} · {regency} · {province}")
 
+    parsed = []
+    for row in rows:
+        dt = base.stamp(row.get("local_datetime"))
+        if not pd.isna(dt):
+            parsed.append((dt, row))
 
-def status_icon(value):
-    value = normalize_status(value)
+    next_pair = next((item for item in parsed if item[0] >= now), parsed[0] if parsed else None)
+    if next_pair:
+        dt, row = next_pair
+        desc = row.get("weather_desc") or "Cuaca"
+        icon = bmkg_weather_emoji(desc)
+        st.markdown(
+            '<div class="dg-bmkg-hero">'
+            f'<strong>{icon} {base.esc(desc)}</strong> · '
+            f'{base.esc(base.date_label(dt))}, {dt.strftime("%H:%M")} WIB<br>'
+            f'Suhu <b>{base.esc(base.fmt(row.get("t"), 0))} °C</b> · '
+            f'RH <b>{base.esc(base.fmt(row.get("hu"), 0))}%</b> · '
+            f'Angin <b>{base.esc(base.fmt(row.get("ws"), 1))} km/jam</b> '
+            f'dari {base.esc(row.get("wd") or "—")}'
+            '</div>',
+            unsafe_allow_html=True,
+        )
 
-    mapping = {
-        "success": "✅",
-        "valid": "✅",
-        "current": "🟢",
-        "partial": "🟡",
-        "delayed": "🟠",
-        "stale": "🔴",
-        "invalid": "🔴",
-        "error": "🔴",
-        "missing": "⚪",
-        "unknown": "⚪",
-        "future_timestamp": "🔴",
-    }
-    return mapping.get(value, "⚪")
+    grouped = {}
+    for dt, row in parsed:
+        grouped.setdefault(dt.date(), []).append((dt, row))
+    dates = list(grouped)[:3]
+    if not dates:
+        return
 
+    tabs = st.tabs([base.date_label(pd.Timestamp(day, tz=base.WIB)) for day in dates])
+    for tab, day in zip(tabs, dates):
+        with tab:
+            cards = []
+            for dt, row in grouped[day]:
+                desc = row.get("weather_desc") or "—"
+                cards.append(
+                    '<div class="dg-bmkg-card">'
+                    f'<div class="dg-bmkg-time">{dt.strftime("%H:%M")} WIB</div>'
+                    f'<div class="dg-bmkg-weather"><span class="emoji">{bmkg_weather_emoji(desc)}</span>'
+                    f'{base.esc(desc)}</div>'
+                    f'<div class="dg-bmkg-temp">{base.esc(base.fmt(row.get("t"), 0))}°C</div>'
+                    f'<div class="dg-bmkg-meta">RH {base.esc(base.fmt(row.get("hu"), 0))}% · '
+                    f'Angin {base.esc(base.fmt(row.get("ws"), 1))} km/jam<br>'
+                    f'Dari {base.esc(row.get("wd") or "—")} · '
+                    f'Jarak pandang {base.esc(row.get("vs_text") or "—")}</div>'
+                    '</div>'
+                )
+            st.markdown(
+                '<div class="dg-bmkg-grid">' + "".join(cards) + "</div>",
+                unsafe_allow_html=True,
+            )
 
-def prediction_text(prediction_value, complete=False):
-    if prediction_value is None or pd.isna(prediction_value):
-        return "Belum tersedia"
-
-    try:
-        prediction_value = int(prediction_value)
-    except Exception:
-        return "Belum tersedia"
-
-    if prediction_value == 1:
-        base = "Terindikasi embun beku"
-    else:
-        base = "Belum terindikasi embun beku"
-
-    if complete:
-        return base
-    return f"{base} (sementara)"
-
-
-def safe_bool(value):
-    if isinstance(value, bool):
-        return value
-    if value is None or pd.isna(value):
-        return False
-    if isinstance(value, str):
-        return value.strip().lower() in {"true", "1", "yes", "y"}
-    return bool(value)
-
-
-# ============================================================
-# 3. SIDEBAR
-# ============================================================
-
-with st.sidebar:
-    st.markdown("## ❄️ DIENGIN")
-    st.caption("Monitoring & Prediksi Embun Beku Dieng")
-
-    st.divider()
-
-    if st.button("🔄 Muat ulang dashboard", width="stretch"):
-        st.rerun()
-
+    analysis = base.stamp(rows[0].get("analysis_date"))
+    analysis_text = base.time_label(analysis) if not pd.isna(analysis) else "—"
     st.markdown(
-        """
-        <div class="small-note">
-        Dashboard membaca file hasil pipeline lokal.
-        Auto-refresh dashboard tidak menjalankan downloader
-        atau model secara otomatis.
-        </div>
-        """,
+        f'<div class="dg-bmkg-source">Sumber data: BMKG · '
+        f'ADM4 {BMKG_ADM4} · Waktu produksi data: {base.esc(analysis_text)}</div>',
         unsafe_allow_html=True,
     )
 
-    st.divider()
-    st.caption("Refresh tampilan: setiap 15 menit")
 
+@st.fragment(run_every="60s")
+def dashboard():
+    now = pd.Timestamp.now(tz=base.WIB)
+    monitor, ms = base.read_file("output/monitoring_latest.json")
+    pred, ps = base.read_file("output/prediction_latest.json")
+    pipeline, ss = base.read_file("output/pipeline_status.json")
+    monitoring_history, hs = base.read_file("data/history/monitoring_history.csv", "csv")
+    release_history, rs = base.read_file("data/history/prediction_release_history.csv", "csv")
+    nights, ns = base.read_file("data/history/prediction_night_history.csv", "csv")
 
-# ============================================================
-# 4. DASHBOARD
-# ============================================================
+    mh = base.timed_frame(monitoring_history, "observation_time_wib")
+    rh = base.timed_frame(release_history, "waktu_rilis_wib")
+    latest = monitor.get("latest_observation") or {}
+    fresh, fresh_text, age = base.freshness(latest.get("time_wib"), now)
 
-st.title("❄️ DIENGIN")
-st.markdown(
-    '<div class="diengin-subtitle">'
-    "Sistem Monitoring dan Prediksi Embun Beku Dieng"
-    "</div>",
-    unsafe_allow_html=True,
-)
+    brand, refresh = st.columns([5.5, 1])
+    with brand:
+        st.markdown(
+            '<div class="dg-brand"><div class="dg-mark">❄</div><div><h1>DIENGIN</h1>'
+            '<p>Cuaca Dieng. Prediksi embun beku.</p></div></div>',
+            unsafe_allow_html=True,
+        )
+    with refresh:
+        if st.button(
+            "↻ Segarkan",
+            width="stretch",
+            help="Membaca hasil terbaru yang sudah tersedia.",
+            key="refresh",
+        ):
+            fetch_bmkg_forecast.clear()
+            st.rerun()
 
-
-@st.fragment(run_every="15m")
-def live_dashboard():
-    monitoring = read_json(MONITORING_JSON)
-    prediction = read_json(PREDICTION_JSON)
-    pipeline = read_json(PIPELINE_JSON)
-
-    monitoring_history = read_csv(MONITORING_HISTORY)
-    release_history = read_csv(RELEASE_HISTORY)
-    night_history = read_csv(NIGHT_HISTORY)
-
-    # --------------------------------------------------------
-    # A. STATUS SISTEM
-    # --------------------------------------------------------
-    st.subheader("Status Sistem")
-
-    pipeline_status = normalize_status(
-        pipeline.get("status") if pipeline else None
-    )
-    monitoring_status = normalize_status(
-        monitoring.get("monitoring_status") if monitoring else None
-    )
-
-    latest_obs = (
-        monitoring.get("latest_observation", {})
-        if monitoring
-        else {}
+    pill = "dg-fresh" if fresh == "current" else "dg-old"
+    st.markdown(
+        f'<div class="dg-strip">'
+        f'<span class="dg-pill {pill}"><i class="dg-dot"></i>{base.esc(fresh_text)}</span>'
+        f'<span class="dg-muted">{base.esc(base.time_label(latest.get("time_wib")))} · '
+        f'{base.esc(base.age_label(age))}</span></div>',
+        unsafe_allow_html=True,
     )
 
-    freshness = normalize_status(
-        latest_obs.get("freshness_status")
+    notices = []
+    if ms != "ok" or monitor.get("status") != "success":
+        notices.append("Monitoring belum tersedia; prediksi dan arsip yang tersedia tetap dapat dibuka.")
+    elif fresh in {"stale", "future", "delayed"}:
+        notices.append("Perhatikan waktu observasi: data ini belum menggambarkan kondisi terbaru.")
+    if monitor.get("monitoring_status") in {"partial", "invalid"}:
+        notices.append("Sebagian parameter tidak tersedia atau tidak lolos pemeriksaan kualitas.")
+    if pipeline and pipeline.get("status") not in {"success", None}:
+        notices.append("Pembaruan sistem terakhir belum berhasil.")
+    if notices:
+        st.markdown(
+            '<div class="dg-info warn">' + base.esc(" ".join(notices)) + "</div>",
+            unsafe_allow_html=True,
+        )
+
+    overview, bmkg_tab, explore, info = st.tabs(
+        ["Ringkasan", "Prediksi BMKG", "Eksplorasi data", "Panduan & status"]
     )
 
-    c1, c2, c3, c4 = st.columns(4)
-
-    with c1:
-        st.metric(
-            "Pipeline",
-            f"{status_icon(pipeline_status)} {pipeline_status.upper()}",
-            border=True,
-        )
-
-    with c2:
-        st.metric(
-            "Monitoring",
-            f"{status_icon(monitoring_status)} {monitoring_status.upper()}",
-            border=True,
-        )
-
-    with c3:
-        st.metric(
-            "Freshness data",
-            f"{status_icon(freshness)} {freshness.upper()}",
-            border=True,
-        )
-
-    with c4:
-        data_age = latest_obs.get("data_age_minutes")
-        st.metric(
-            "Umur data",
-            fmt_float(data_age, 1, " menit"),
-            border=True,
-        )
-
-    if monitoring is None:
-        st.error(
-            "monitoring_latest.json belum tersedia. "
-            "Jalankan pipeline DIENGIN terlebih dahulu."
-        )
-        return
-
-    if monitoring.get("status") != "success":
-        st.error(
-            monitoring.get(
-                "message",
-                "Monitoring terakhir tidak berhasil.",
-            )
-        )
-        return
-
-    if freshness in {"stale", "future_timestamp"}:
-        st.warning(
-            "Data AWS terbaru tidak berada dalam status current. "
-            "Interpretasi kondisi terkini dan prediksi perlu dilakukan dengan hati-hati."
-        )
-    elif monitoring_status in {"partial", "invalid"}:
-        st.warning(
-            "Sebagian parameter monitoring tidak tersedia atau tidak lolos "
-            "aturan QC operasional DIENGIN."
-        )
-
-    # --------------------------------------------------------
-    # B. MONITORING TERKINI
-    # --------------------------------------------------------
-    st.subheader("Monitoring AWS Terkini")
-
-    station = monitoring.get("station") or {}
-    params = latest_obs.get("parameters") or {}
-    source_values = latest_obs.get("source_values") or {}
-    adapter = latest_obs.get("operational_adapter") or {}
-    trend = monitoring.get("trend_1h") or {}
-
-    st.caption(
-        f"Observasi terbaru: **{fmt_wib(latest_obs.get('time_wib'))}**"
-        + (
-            f" · {station.get('station_name')}"
-            if station.get("station_name")
-            else ""
-        )
-    )
-
-    m1, m2, m3, m4 = st.columns(4)
-
-    with m1:
-        st.metric(
-            "Suhu udara",
-            fmt_float(params.get("tt_air_avg"), 2, " °C"),
-            delta=(
-                fmt_float(trend.get("tt_air_avg_change"), 2, " °C / ~1 jam")
-                if trend.get("tt_air_avg_change") is not None
-                else None
-            ),
-            border=True,
-        )
-
-    with m2:
-        st.metric(
-            "Suhu minimum",
-            fmt_float(params.get("tt_air_min"), 2, " °C"),
-            delta=(
-                fmt_float(trend.get("tt_air_min_change"), 2, " °C / ~1 jam")
-                if trend.get("tt_air_min_change") is not None
-                else None
-            ),
-            border=True,
-        )
-
-    rh_effective = params.get("rh_avg")
-    rh_source = source_values.get("rh_avg_source")
-    rh_invalid = safe_bool(adapter.get("rh_adapter_invalid"))
-
-    with m3:
-        if rh_effective is not None:
-            rh_display = fmt_float(rh_effective, 1, " %")
-        elif rh_invalid and rh_source is not None:
-            rh_display = "Unavailable"
-        else:
-            rh_display = "—"
-
-        st.metric(
-            "Kelembapan relatif",
-            rh_display,
-            delta=(
-                fmt_float(trend.get("rh_avg_change"), 1, " % / ~1 jam")
-                if trend.get("rh_avg_change") is not None
-                else None
-            ),
-            border=True,
-        )
-
-        if rh_invalid and rh_source is not None:
-            st.caption(
-                f"Nilai sumber: {fmt_float(rh_source, 1, ' %')} · "
-                "tidak dipakai oleh adapter operasional."
-            )
-
-    with m4:
-        st.metric(
-            "Kecepatan angin",
-            fmt_float(params.get("ws_avg"), 2),
-            delta=(
-                fmt_float(trend.get("ws_avg_change"), 2, " / ~1 jam")
-                if trend.get("ws_avg_change") is not None
-                else None
-            ),
-            border=True,
-        )
-
-    e1, e2, e3, e4 = st.columns(4)
-
-    with e1:
-        st.metric(
-            "Titik embun",
-            fmt_float(params.get("dew_point_c"), 2, " °C"),
-            border=True,
-        )
-
-    with e2:
-        st.metric(
-            "Curah hujan",
-            fmt_float(params.get("rr"), 2, " mm"),
-            border=True,
-        )
-
-    with e3:
-        st.metric(
-            "Tekanan",
-            fmt_float(params.get("pp_air"), 2, " hPa"),
-            border=True,
-        )
-
-    with e4:
-        wd = params.get("wd_avg")
-        st.metric(
-            "Arah angin",
-            fmt_float(wd, 1, "°"),
-            border=True,
-        )
-
-    # --------------------------------------------------------
-    # C. PREDIKSI
-    # --------------------------------------------------------
-    st.subheader("Prediksi Embun Beku")
-
-    if prediction is None:
-        st.info(
-            "prediction_latest.json belum tersedia."
-        )
-    elif prediction.get("status") != "success":
-        st.warning(
-            prediction.get(
-                "message",
-                "Prediksi terbaru belum tersedia.",
-            )
-        )
-    else:
-        threshold = prediction.get("threshold_stacked")
-        pmax = prediction.get("probability_max_so_far")
-        latest_release = prediction.get("latest_release") or {}
-        latest_prob = latest_release.get("stacked_probability")
-        prediction_value = prediction.get("prediction_so_far")
-        night_complete = safe_bool(prediction.get("night_complete"))
-        available = prediction.get("releases_available")
-        expected = prediction.get("releases_expected")
-
-        p1, p2, p3, p4 = st.columns(4)
-
-        with p1:
-            st.metric(
-                "Probabilitas rilis terakhir",
-                fmt_probability(latest_prob),
-                border=True,
-            )
-
-        with p2:
-            st.metric(
-                "Probabilitas maksimum",
-                fmt_probability(pmax),
-                border=True,
-            )
-
-        with p3:
-            st.metric(
-                "Ambang klasifikasi",
-                fmt_probability(threshold),
-                border=True,
-            )
-
-        with p4:
-            st.metric(
-                "Rilis tersedia",
-                (
-                    f"{available}/{expected}"
-                    if available is not None and expected is not None
-                    else "—"
-                ),
-                border=True,
-            )
-
-        pred_label = prediction_text(
-            prediction_value,
-            complete=night_complete,
-        )
-
-        if prediction_value == 1:
-            st.warning(f"**{pred_label}**")
-        elif prediction_value == 0:
-            st.success(f"**{pred_label}**")
-        else:
-            st.info("**Prediksi malam belum tersedia.**")
-
-        if latest_release:
-            st.caption(
-                "Rilis terakhir: "
-                f"**{int(latest_release.get('hour_wib')):02d}:00 WIB**"
-                if latest_release.get("hour_wib") is not None
-                else "Rilis terakhir: —"
-            )
-
-        if not night_complete:
-            st.caption(
-                "Status masih sementara karena seluruh 11 jam rilis "
-                "malam target belum lengkap."
-            )
-
-        if pmax is not None:
-            progress_value = min(max(float(pmax), 0.0), 1.0)
-            st.progress(
-                progress_value,
-                text=(
-                    f"Probabilitas maksimum sementara {progress_value * 100:.2f}% "
-                    f"· ambang {float(threshold) * 100:.2f}%"
-                    if threshold is not None
-                    else f"Probabilitas maksimum sementara {progress_value * 100:.2f}%"
-                ),
-            )
-
-    # --------------------------------------------------------
-    # D. GRAFIK HISTORY MONITORING
-    # --------------------------------------------------------
-    st.subheader("Riwayat Monitoring")
-
-    if monitoring_history.empty:
-        st.info(
-            "History monitoring belum cukup untuk ditampilkan."
-        )
-    else:
-        mh = monitoring_history.copy()
-        mh["observation_time_wib"] = pd.to_datetime(
-            mh["observation_time_wib"],
-            errors="coerce",
-        )
-        mh = mh.dropna(subset=["observation_time_wib"]).sort_values(
-            "observation_time_wib"
-        )
-
-        # batasi tampilan untuk performa dashboard
-        mh = mh.tail(288)  # ~48 jam bila data 10-menitan tersimpan lengkap
-
-        tab_temp, tab_rh, tab_wind = st.tabs(
-            ["Suhu", "Kelembapan", "Angin"]
-        )
-
-        with tab_temp:
-            temp_cols = [
-                col for col in ["tt_air_avg", "tt_air_min", "tmin_min_1h"]
-                if col in mh.columns
-            ]
-            if temp_cols:
-                st.line_chart(
-                    mh,
-                    x="observation_time_wib",
-                    y=temp_cols,
-                    x_label="Waktu",
-                    y_label="Suhu (°C)",
-                    height=330,
-                )
-            else:
-                st.info("Data suhu belum tersedia pada history.")
-
-        with tab_rh:
-            if "rh_avg" in mh.columns:
-                st.line_chart(
-                    mh,
-                    x="observation_time_wib",
-                    y="rh_avg",
-                    x_label="Waktu",
-                    y_label="RH (%)",
-                    height=330,
-                )
-            else:
-                st.info("Data RH belum tersedia pada history.")
-
-        with tab_wind:
-            wind_cols = [
-                col for col in ["ws_avg", "ws_mean_1h", "ws_max_1h"]
-                if col in mh.columns
-            ]
-            if wind_cols:
-                st.line_chart(
-                    mh,
-                    x="observation_time_wib",
-                    y=wind_cols,
-                    x_label="Waktu",
-                    y_label="Kecepatan angin",
-                    height=330,
-                )
-            else:
-                st.info("Data angin belum tersedia pada history.")
-
-    # --------------------------------------------------------
-    # E. RIWAYAT PROBABILITAS RILIS
-    # --------------------------------------------------------
-    st.subheader("Riwayat Probabilitas Rilis")
-
-    if release_history.empty:
-        st.info(
-            "History rilis prediksi belum tersedia."
-        )
-    else:
-        rh = release_history.copy()
-
-        if "waktu_rilis_wib" in rh.columns:
-            rh["waktu_rilis_wib"] = pd.to_datetime(
-                rh["waktu_rilis_wib"],
-                errors="coerce",
-            )
-
-        if "stack_prob" in rh.columns:
-            rh["stack_prob_pct"] = (
-                pd.to_numeric(
-                    rh["stack_prob"],
-                    errors="coerce",
-                )
-                * 100.0
-            )
-
-            threshold_value = None
-            if prediction and prediction.get("threshold_stacked") is not None:
-                threshold_value = float(
-                    prediction["threshold_stacked"]
-                ) * 100.0
-
-            if threshold_value is not None:
-                rh["ambang_pct"] = threshold_value
-
-            rh_plot = (
-                rh.dropna(
-                    subset=["waktu_rilis_wib"]
-                    if "waktu_rilis_wib" in rh.columns
-                    else []
-                )
-                .sort_values(
-                    "waktu_rilis_wib"
-                    if "waktu_rilis_wib" in rh.columns
-                    else rh.columns[0]
-                )
-                .tail(55)
-            )
-
-            y_cols = ["stack_prob_pct"]
-            if "ambang_pct" in rh_plot.columns:
-                y_cols.append("ambang_pct")
-
-            if "waktu_rilis_wib" in rh_plot.columns:
-                st.line_chart(
-                    rh_plot,
-                    x="waktu_rilis_wib",
-                    y=y_cols,
-                    x_label="Jam rilis",
-                    y_label="Probabilitas (%)",
-                    height=330,
+    with overview:
+        forecast_col, weather_col = st.columns([1, 2.15])
+        with forecast_col:
+            base.render_forecast(pred, now)
+        with weather_col:
+            base.render_weather(monitor)
+            change = base.number((monitor.get("trend_1h") or {}).get("tt_air_avg_change"))
+            if change is not None and monitor.get("status") == "success":
+                st.markdown(
+                    '<div class="dg-info">' + base.esc(
+                        f"Suhu {'turun' if change < 0 else 'naik' if change > 0 else 'tetap'} "
+                        f"{base.fmt(abs(change))} °C dibanding referensi sekitar 1 jam sebelumnya. "
+                        "Tren ini bukan konfirmasi frost."
+                    ) + "</div>",
+                    unsafe_allow_html=True,
                 )
 
-        show_cols = [
-            col for col in [
-                "tanggal_target",
-                "jam_rilis_wib",
-                "waktu_rilis_wib",
-                "stack_prob",
-                "ann_prob",
-                "svm_prob",
-                "rf_prob",
-                "status_data_rilis",
-            ]
-            if col in rh.columns
-        ]
+        weather_plot, release_plot = st.columns([1, 1])
+        with weather_plot:
+            base.render_trend(mh)
+        with release_plot:
+            base.render_prediction_history(rh, nights, pred, now)
 
-        if show_cols:
-            table = rh[show_cols].tail(22).copy()
+        st.download_button(
+            "↓ Simpan ringkasan",
+            data=(
+                f"DIENGIN\nObservasi: {base.time_label(latest.get('time_wib'))}\n"
+                f"Status data: {fresh_text}\nTarget prediksi: {base.date_label(pred.get('target_night_date'))}\n"
+                f"Hasil: {base.prediction_state(pred, now)['label']}\n"
+                f"Probabilitas maksimum dari rilis tersedia: {base.pct(pred.get('probability_max_so_far'))}\n"
+                f"Rilis terakhir: {base.time_label((pred.get('latest_release') or {}).get('release_time_wib'))}\n"
+                "Prototipe penelitian; bukan peringatan resmi BMKG.\n"
+            ).encode("utf-8"),
+            file_name="diengin_ringkasan.txt",
+            mime="text/plain",
+            key="summary_download",
+        )
 
-            for col in ["stack_prob", "ann_prob", "svm_prob", "rf_prob"]:
-                if col in table.columns:
-                    table[col] = (
-                        pd.to_numeric(table[col], errors="coerce") * 100
-                    ).round(3)
+    with bmkg_tab:
+        render_bmkg_forecast(now)
 
-            st.dataframe(
-                table,
-                width="stretch",
-                hide_index=True,
-            )
+    with explore:
+        base.render_explore(mh, nights)
 
-    # --------------------------------------------------------
-    # F. NIGHT HISTORY
-    # --------------------------------------------------------
-    with st.expander("Riwayat ringkasan malam"):
-        if night_history.empty:
-            st.info("Ringkasan history malam belum tersedia.")
-        else:
-            nh = night_history.tail(30).copy()
-            st.dataframe(
-                nh,
-                width="stretch",
-                hide_index=True,
-            )
+    with info:
+        base.render_info(
+            monitor,
+            pred,
+            pipeline,
+            {
+                "monitoring": ms,
+                "prediksi": ps,
+                "pipeline": ss,
+                "riwayat_monitoring": hs,
+                "riwayat_rilis": rs,
+                "riwayat_malam": ns,
+            },
+            now,
+        )
 
-    # --------------------------------------------------------
-    # G. FOOTER
-    # --------------------------------------------------------
-    st.divider()
-
-    generated_monitoring = (
-        monitoring.get("generated_at_wib")
-        if monitoring
-        else None
-    )
-    generated_prediction = (
-        prediction.get("generated_at_wib")
-        if prediction
-        else None
-    )
-
-    st.caption(
-        f"Monitoring diperbarui sistem: {fmt_wib(generated_monitoring)} · "
-        f"Prediksi diperbarui sistem: {fmt_wib(generated_prediction)}"
-    )
-    st.caption(
-        "DIENGIN merupakan prototipe penelitian monitoring dan prediksi "
-        "embun beku berbasis AWS dan model skripsi; bukan produk peringatan resmi BMKG."
+    st.markdown(
+        '<div class="dg-footer">DIENGIN · Prototipe penelitian, bukan peringatan resmi BMKG. '
+        'Prakiraan cuaca pada tab Prediksi BMKG bersumber dari BMKG. '
+        'Seluruh waktu dalam WIB. Data kosong tidak berarti nol.</div>',
+        unsafe_allow_html=True,
     )
 
 
-live_dashboard()
+base.dashboard = dashboard
+
+
+if __name__ == "__main__":
+    base.main()
