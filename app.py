@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-DIENGIN - Dashboard v1
+DIENGIN - Dashboard v2
 Sistem Monitoring dan Prediksi Embun Beku Dieng
 
 Dashboard ini:
@@ -43,7 +43,7 @@ st.set_page_config(
     page_title="DIENGIN",
     page_icon="❄️",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",
 )
 
 
@@ -55,8 +55,34 @@ st.markdown(
     """
     <style>
     .block-container {
-        padding-top: 1.3rem;
-        padding-bottom: 2rem;
+        max-width: 1280px;
+        padding-top: 2rem;
+        padding-bottom: 3rem;
+    }
+    .diengin-hero {
+        background: linear-gradient(120deg, #102f43, #145b68);
+        color: #ffffff;
+        border-radius: 1.25rem;
+        padding: 1.6rem 1.8rem;
+        margin-bottom: 1.4rem;
+    }
+    .diengin-hero h1 { color: #ffffff; padding: 0; font-size: 2.5rem; }
+    .diengin-hero p { color: #e0f2f1; margin: .4rem 0 0; }
+    .diengin-eyebrow {
+        text-transform: uppercase; letter-spacing: .14em;
+        font-size: .75rem; font-weight: 600; margin-bottom: .5rem;
+    }
+    [data-testid="stMetric"] { border-radius: 1rem; padding: 1rem; }
+    [data-testid="stMetricValue"] {
+        font-size: clamp(1.3rem, 2.4vw, 2rem);
+        font-variant-numeric: tabular-nums;
+    }
+    [data-testid="stMetricLabel"] { font-weight: 500; }
+    @media (max-width: 640px) {
+        .block-container { padding: 1rem 1rem 2rem; }
+        .diengin-hero { padding: 1.25rem; }
+        .diengin-hero h1 { font-size: 2rem; }
+        [data-testid="stMetric"] { padding: .8rem; }
     }
 
     .diengin-subtitle {
@@ -205,27 +231,36 @@ with st.sidebar:
     st.markdown(
         """
         <div class="small-note">
-        Dashboard membaca file hasil pipeline lokal.
-        Auto-refresh dashboard tidak menjalankan downloader
-        atau model secara otomatis.
+        Pantau kondisi AWS dan perkembangan prediksi embun beku.
+        Waktu observasi menunjukkan kapan pengukuran dilakukan.
         </div>
         """,
         unsafe_allow_html=True,
     )
 
     st.divider()
-    st.caption("Refresh tampilan: setiap 15 menit")
+    st.caption("Pembaruan tampilan otomatis setiap 15 menit selama dashboard terbuka.")
+    st.caption("Data baru mengikuti hasil pembaruan sistem yang berhasil.")
+    history_hours = st.selectbox(
+        "Periode grafik monitoring",
+        options=[6, 12, 24, 48],
+        index=2,
+        format_func=lambda hours: f"{hours} jam terakhir",
+    )
 
 
 # ============================================================
 # 4. DASHBOARD
 # ============================================================
 
-st.title("❄️ DIENGIN")
 st.markdown(
-    '<div class="diengin-subtitle">'
-    "Sistem Monitoring dan Prediksi Embun Beku Dieng"
-    "</div>",
+    """
+    <div class="diengin-hero">
+        <div class="diengin-eyebrow">Pemantauan cuaca · Dataran Tinggi Dieng</div>
+        <h1>❄️ DIENGIN</h1>
+        <p>Monitoring cuaca dan prediksi embun beku dalam satu dashboard.</p>
+    </div>
+    """,
     unsafe_allow_html=True,
 )
 
@@ -243,7 +278,6 @@ def live_dashboard():
     # --------------------------------------------------------
     # A. STATUS SISTEM
     # --------------------------------------------------------
-    st.subheader("Status Sistem")
 
     pipeline_status = normalize_status(
         pipeline.get("status") if pipeline else None
@@ -262,41 +296,47 @@ def live_dashboard():
         latest_obs.get("freshness_status")
     )
 
-    c1, c2, c3, c4 = st.columns(4)
+    st.caption(f"Observasi AWS: {fmt_wib(latest_obs.get('time_wib'))}")
+    with st.expander("Status data dan sistem", expanded=False):
+        c1, c2, c3, c4 = st.columns(4)
 
-    with c1:
-        st.metric(
-            "Pipeline",
-            f"{status_icon(pipeline_status)} {pipeline_status.upper()}",
-            border=True,
-        )
+        with c1:
+            st.metric(
+                "Pipeline",
+                f"{status_icon(pipeline_status)} {pipeline_status.upper()}",
+                border=True,
+            )
 
-    with c2:
-        st.metric(
-            "Monitoring",
-            f"{status_icon(monitoring_status)} {monitoring_status.upper()}",
-            border=True,
-        )
+        with c2:
+            st.metric(
+                "Monitoring",
+                f"{status_icon(monitoring_status)} {monitoring_status.upper()}",
+                border=True,
+            )
 
-    with c3:
-        st.metric(
-            "Freshness data",
-            f"{status_icon(freshness)} {freshness.upper()}",
-            border=True,
-        )
+        with c3:
+            st.metric(
+                "Keterkinian saat diproses",
+                f"{status_icon(freshness)} {freshness.upper()}",
+                border=True,
+            )
 
-    with c4:
-        data_age = latest_obs.get("data_age_minutes")
-        st.metric(
-            "Umur data",
-            fmt_float(data_age, 1, " menit"),
-            border=True,
+        with c4:
+            data_age = latest_obs.get("data_age_minutes")
+            st.metric(
+                "Umur data saat diproses",
+                fmt_float(data_age, 1, " menit"),
+                border=True,
+            )
+        st.caption(
+            "Status dan umur data dicatat saat pemrosesan terakhir: "
+            + fmt_wib(monitoring.get("generated_at_wib") if monitoring else None)
         )
 
     if monitoring is None:
         st.error(
-            "monitoring_latest.json belum tersedia. "
-            "Jalankan pipeline DIENGIN terlebih dahulu."
+            "Data monitoring belum tersedia. "
+            "Coba muat ulang setelah pembaruan sistem berikutnya."
         )
         return
 
@@ -311,7 +351,7 @@ def live_dashboard():
 
     if freshness in {"stale", "future_timestamp"}:
         st.warning(
-            "Data AWS terbaru tidak berada dalam status current. "
+            "Data AWS tercatat terlambat atau memiliki waktu yang tidak sesuai. "
             "Interpretasi kondisi terkini dan prediksi perlu dilakukan dengan hati-hati."
         )
     elif monitoring_status in {"partial", "invalid"}:
@@ -321,131 +361,13 @@ def live_dashboard():
         )
 
     # --------------------------------------------------------
-    # B. MONITORING TERKINI
-    # --------------------------------------------------------
-    st.subheader("Monitoring AWS Terkini")
-
-    station = monitoring.get("station") or {}
-    params = latest_obs.get("parameters") or {}
-    source_values = latest_obs.get("source_values") or {}
-    adapter = latest_obs.get("operational_adapter") or {}
-    trend = monitoring.get("trend_1h") or {}
-
-    st.caption(
-        f"Observasi terbaru: **{fmt_wib(latest_obs.get('time_wib'))}**"
-        + (
-            f" · {station.get('station_name')}"
-            if station.get("station_name")
-            else ""
-        )
-    )
-
-    m1, m2, m3, m4 = st.columns(4)
-
-    with m1:
-        st.metric(
-            "Suhu udara",
-            fmt_float(params.get("tt_air_avg"), 2, " °C"),
-            delta=(
-                fmt_float(trend.get("tt_air_avg_change"), 2, " °C / ~1 jam")
-                if trend.get("tt_air_avg_change") is not None
-                else None
-            ),
-            border=True,
-        )
-
-    with m2:
-        st.metric(
-            "Suhu minimum",
-            fmt_float(params.get("tt_air_min"), 2, " °C"),
-            delta=(
-                fmt_float(trend.get("tt_air_min_change"), 2, " °C / ~1 jam")
-                if trend.get("tt_air_min_change") is not None
-                else None
-            ),
-            border=True,
-        )
-
-    rh_effective = params.get("rh_avg")
-    rh_source = source_values.get("rh_avg_source")
-    rh_invalid = safe_bool(adapter.get("rh_adapter_invalid"))
-
-    with m3:
-        if rh_effective is not None:
-            rh_display = fmt_float(rh_effective, 1, " %")
-        elif rh_invalid and rh_source is not None:
-            rh_display = "Unavailable"
-        else:
-            rh_display = "—"
-
-        st.metric(
-            "Kelembapan relatif",
-            rh_display,
-            delta=(
-                fmt_float(trend.get("rh_avg_change"), 1, " % / ~1 jam")
-                if trend.get("rh_avg_change") is not None
-                else None
-            ),
-            border=True,
-        )
-
-        if rh_invalid and rh_source is not None:
-            st.caption(
-                f"Nilai sumber: {fmt_float(rh_source, 1, ' %')} · "
-                "tidak dipakai oleh adapter operasional."
-            )
-
-    with m4:
-        st.metric(
-            "Kecepatan angin",
-            fmt_float(params.get("ws_avg"), 2),
-            delta=(
-                fmt_float(trend.get("ws_avg_change"), 2, " / ~1 jam")
-                if trend.get("ws_avg_change") is not None
-                else None
-            ),
-            border=True,
-        )
-
-    e1, e2, e3, e4 = st.columns(4)
-
-    with e1:
-        st.metric(
-            "Titik embun",
-            fmt_float(params.get("dew_point_c"), 2, " °C"),
-            border=True,
-        )
-
-    with e2:
-        st.metric(
-            "Curah hujan",
-            fmt_float(params.get("rr"), 2, " mm"),
-            border=True,
-        )
-
-    with e3:
-        st.metric(
-            "Tekanan",
-            fmt_float(params.get("pp_air"), 2, " hPa"),
-            border=True,
-        )
-
-    with e4:
-        wd = params.get("wd_avg")
-        st.metric(
-            "Arah angin",
-            fmt_float(wd, 1, "°"),
-            border=True,
-        )
-
-    # --------------------------------------------------------
-    # C. PREDIKSI
+    # B. PREDIKSI
     # --------------------------------------------------------
     st.subheader("Prediksi Embun Beku")
 
     if prediction is None:
         st.info(
-            "prediction_latest.json belum tersedia."
+            "Prediksi belum tersedia. Menunggu hasil pembaruan sistem."
         )
     elif prediction.get("status") != "success":
         st.warning(
@@ -463,6 +385,18 @@ def live_dashboard():
         night_complete = safe_bool(prediction.get("night_complete"))
         available = prediction.get("releases_available")
         expected = prediction.get("releases_expected")
+
+        st.caption(
+            f"Tanggal target: {prediction.get('target_night_date') or '—'}"
+            f" · Rilis terakhir: {fmt_wib(latest_release.get('release_time_wib'))}"
+        )
+        pred_label = prediction_text(prediction_value, complete=night_complete)
+        if prediction_value == 1:
+            st.warning(f"**{pred_label}**")
+        elif prediction_value == 0:
+            st.success(f"**{pred_label}**")
+        else:
+            st.info("**Prediksi malam belum tersedia.**")
 
         p1, p2, p3, p4 = st.columns(4)
 
@@ -498,30 +432,10 @@ def live_dashboard():
                 border=True,
             )
 
-        pred_label = prediction_text(
-            prediction_value,
-            complete=night_complete,
-        )
-
-        if prediction_value == 1:
-            st.warning(f"**{pred_label}**")
-        elif prediction_value == 0:
-            st.success(f"**{pred_label}**")
-        else:
-            st.info("**Prediksi malam belum tersedia.**")
-
-        if latest_release:
-            st.caption(
-                "Rilis terakhir: "
-                f"**{int(latest_release.get('hour_wib')):02d}:00 WIB**"
-                if latest_release.get("hour_wib") is not None
-                else "Rilis terakhir: —"
-            )
-
         if not night_complete:
             st.caption(
-                "Status masih sementara karena seluruh 11 jam rilis "
-                "malam target belum lengkap."
+                f"Prediksi sementara: {available or 0} dari {expected or '—'} "
+                "rilis tersedia. Hasil dapat berubah pada rilis berikutnya."
             )
 
         if pmax is not None:
@@ -529,12 +443,134 @@ def live_dashboard():
             st.progress(
                 progress_value,
                 text=(
-                    f"Probabilitas maksimum sementara {progress_value * 100:.2f}% "
+                    f"Probabilitas maksimum dari rilis tersedia {progress_value * 100:.2f}% "
                     f"· ambang {float(threshold) * 100:.2f}%"
                     if threshold is not None
-                    else f"Probabilitas maksimum sementara {progress_value * 100:.2f}%"
+                    else f"Probabilitas maksimum dari rilis tersedia {progress_value * 100:.2f}%"
                 ),
             )
+
+    # --------------------------------------------------------
+    # C. MONITORING TERKINI
+    # --------------------------------------------------------
+    st.subheader("Monitoring AWS Terkini")
+
+    station = monitoring.get("station") or {}
+    params = latest_obs.get("parameters") or {}
+    source_values = latest_obs.get("source_values") or {}
+    adapter = latest_obs.get("operational_adapter") or {}
+    trend = monitoring.get("trend_1h") or {}
+
+    st.caption(
+        f"Observasi terbaru: **{fmt_wib(latest_obs.get('time_wib'))}**"
+        + (
+            f" · {station.get('station_name')}"
+            if station.get("station_name")
+            else ""
+        )
+    )
+
+    m1, m2, m3, m4 = st.columns(4)
+
+    with m1:
+        st.metric(
+            "Suhu udara",
+            fmt_float(params.get("tt_air_avg"), 2, " °C"),
+            delta_color="off",
+            delta=(
+                fmt_float(trend.get("tt_air_avg_change"), 2, " °C / ~1 jam")
+                if trend.get("tt_air_avg_change") is not None
+                else None
+            ),
+            border=True,
+        )
+
+    with m2:
+        st.metric(
+            "Suhu minimum observasi",
+            fmt_float(params.get("tt_air_min"), 2, " °C"),
+            delta_color="off",
+            delta=(
+                fmt_float(trend.get("tt_air_min_change"), 2, " °C / ~1 jam")
+                if trend.get("tt_air_min_change") is not None
+                else None
+            ),
+            border=True,
+        )
+
+    rh_effective = params.get("rh_avg")
+    rh_source = source_values.get("rh_avg_source")
+    rh_invalid = safe_bool(adapter.get("rh_adapter_invalid"))
+
+    with m3:
+        if rh_effective is not None:
+            rh_display = fmt_float(rh_effective, 1, " %")
+        elif rh_invalid and rh_source is not None:
+            rh_display = "Tidak tersedia"
+        else:
+            rh_display = "—"
+
+        st.metric(
+            "Kelembapan relatif",
+            rh_display,
+            delta_color="off",
+            delta=(
+                fmt_float(trend.get("rh_avg_change"), 1, " % / ~1 jam")
+                if trend.get("rh_avg_change") is not None
+                else None
+            ),
+            border=True,
+        )
+
+        if rh_invalid and rh_source is not None:
+            st.caption(
+                f"Nilai sumber: {fmt_float(rh_source, 1, ' %')} · "
+                "tidak lolos pemeriksaan kualitas data."
+            )
+
+    with m4:
+        st.metric(
+            "Kecepatan angin",
+            fmt_float(params.get("ws_avg"), 2),
+            delta_color="off",
+            delta=(
+                fmt_float(trend.get("ws_avg_change"), 2, " / ~1 jam")
+                if trend.get("ws_avg_change") is not None
+                else None
+            ),
+            border=True,
+        )
+
+    e1, e2, e3, e4 = st.columns(4)
+
+    with e1:
+        st.metric(
+            "Titik embun",
+            fmt_float(params.get("dew_point_c"), 2, " °C"),
+            border=True,
+        )
+
+    with e2:
+        st.metric(
+            "Curah hujan AWS",
+            fmt_float(params.get("rr"), 2, " mm"),
+            border=True,
+        )
+
+    with e3:
+        st.metric(
+            "Tekanan",
+            fmt_float(params.get("pp_air"), 2, " hPa"),
+            border=True,
+        )
+
+    with e4:
+        wd = params.get("wd_avg")
+        st.metric(
+            "Arah angin",
+            fmt_float(wd, 1, "°"),
+            border=True,
+        )
 
     # --------------------------------------------------------
     # D. GRAFIK HISTORY MONITORING
@@ -555,8 +591,14 @@ def live_dashboard():
             "observation_time_wib"
         )
 
-        # batasi tampilan untuk performa dashboard
-        mh = mh.tail(288)  # ~48 jam bila data 10-menitan tersimpan lengkap
+        # Use elapsed time because stored observations may have gaps.
+        if not mh.empty:
+            cutoff = mh["observation_time_wib"].max() - pd.Timedelta(hours=history_hours)
+            mh = mh.loc[mh["observation_time_wib"] >= cutoff]
+        st.caption(
+            f"{history_hours} jam terakhir dari observasi tersimpan · "
+            "waktu pada grafik dalam WIB."
+        )
 
         tab_temp, tab_rh, tab_wind = st.tabs(
             ["Suhu", "Kelembapan", "Angin"]
@@ -568,11 +610,16 @@ def live_dashboard():
                 if col in mh.columns
             ]
             if temp_cols:
+                temp_cols_labels = {
+                    "tt_air_avg": "Suhu udara",
+                    "tt_air_min": "Suhu minimum observasi",
+                    "tmin_min_1h": "Suhu minimum 1 jam",
+                }
                 st.line_chart(
-                    mh,
+                    mh.rename(columns=temp_cols_labels),
                     x="observation_time_wib",
-                    y=temp_cols,
-                    x_label="Waktu",
+                    y=[temp_cols_labels[col] for col in temp_cols],
+                    x_label="Waktu (WIB)",
                     y_label="Suhu (°C)",
                     height=330,
                 )
@@ -582,10 +629,10 @@ def live_dashboard():
         with tab_rh:
             if "rh_avg" in mh.columns:
                 st.line_chart(
-                    mh,
+                    mh.rename(columns={"rh_avg": "Kelembapan relatif"}),
                     x="observation_time_wib",
-                    y="rh_avg",
-                    x_label="Waktu",
+                    y="Kelembapan relatif",
+                    x_label="Waktu (WIB)",
                     y_label="RH (%)",
                     height=330,
                 )
@@ -598,11 +645,16 @@ def live_dashboard():
                 if col in mh.columns
             ]
             if wind_cols:
+                wind_cols_labels = {
+                    "ws_avg": "Angin observasi",
+                    "ws_mean_1h": "Angin rata-rata 1 jam",
+                    "ws_max_1h": "Angin maksimum 1 jam",
+                }
                 st.line_chart(
-                    mh,
+                    mh.rename(columns=wind_cols_labels),
                     x="observation_time_wib",
-                    y=wind_cols,
-                    x_label="Waktu",
+                    y=[wind_cols_labels[col] for col in wind_cols],
+                    x_label="Waktu (WIB)",
                     y_label="Kecepatan angin",
                     height=330,
                 )
@@ -664,11 +716,15 @@ def live_dashboard():
                 y_cols.append("ambang_pct")
 
             if "waktu_rilis_wib" in rh_plot.columns:
+                y_cols_labels = {
+                    "stack_prob_pct": "Probabilitas embun beku",
+                    "ambang_pct": "Ambang klasifikasi",
+                }
                 st.line_chart(
-                    rh_plot,
+                    rh_plot.rename(columns=y_cols_labels),
                     x="waktu_rilis_wib",
-                    y=y_cols,
-                    x_label="Jam rilis",
+                    y=[y_cols_labels[col] for col in y_cols],
+                    x_label="Waktu rilis (WIB)",
                     y_label="Probabilitas (%)",
                     height=330,
                 )
@@ -696,11 +752,21 @@ def live_dashboard():
                         pd.to_numeric(table[col], errors="coerce") * 100
                     ).round(3)
 
-            st.dataframe(
-                table,
-                width="stretch",
-                hide_index=True,
-            )
+            with st.expander("Lihat rincian probabilitas tiap model"):
+                st.dataframe(
+                    table.rename(columns={
+                        "tanggal_target": "Tanggal target",
+                        "jam_rilis_wib": "Jam rilis (WIB)",
+                        "waktu_rilis_wib": "Waktu rilis (WIB)",
+                        "stack_prob": "Stacked (%)",
+                        "ann_prob": "ANN (%)",
+                        "svm_prob": "SVM (%)",
+                        "rf_prob": "RF (%)",
+                        "status_data_rilis": "Status data",
+                    }),
+                    width="stretch",
+                    hide_index=True,
+                )
 
     # --------------------------------------------------------
     # F. NIGHT HISTORY
