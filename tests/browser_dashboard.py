@@ -59,12 +59,18 @@ with tempfile.TemporaryDirectory() as tmp:
                     assert page.locator('[data-testid="stVegaLiteChart"]').first.is_visible(), "Chart did not render"
                     assert page.locator('[data-testid="stException"]').count() == 0
                     assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 2"), "Horizontal page overflow"
+                    brand_bounds = page.locator(".dg-brand").bounding_box()
+                    assert brand_bounds and brand_bounds["y"] >= 55, "Brand overlapped by Streamlit toolbar"
                     # Primary weather values must be visible near the top on desktop.
                     if device == "desktop":
                         bounds = page.get_by_text("Suhu udara", exact=True).first.bounding_box()
                         assert bounds and bounds["y"] < 500, bounds
                     page.get_by_role("tab", name="Eksplorasi data").click()
                     page.get_by_text("Eksplorasi observasi", exact=True).wait_for()
+                    with page.expect_download() as download:
+                        page.get_by_role("button", name="↓ Unduh CSV", exact=True).filter(visible=True).first.click()
+                    csv_text = Path(download.value.path()).read_text(encoding="utf-8-sig")
+                    assert "observation_time_wib" in csv_text and "tt_air_avg" in csv_text
                     page.get_by_role("tab", name="Panduan & status").click()
                     page.get_by_text("Kenali angkanya", exact=True).wait_for()
                     assert not errors, errors

@@ -1,9 +1,6 @@
 name: Dashboard UI checks
 
 on:
-  push:
-    branches: [codex/improve-dashboard-ui]
-    paths: [app.py, requirements_dashboard.txt, tests/**, .github/workflows/dashboard-ui.yml]
   pull_request:
     paths: [app.py, requirements_dashboard.txt, tests/**, .github/workflows/dashboard-ui.yml]
   workflow_dispatch:

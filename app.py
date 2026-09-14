@@ -29,7 +29,7 @@ PROB_LABELS = {"stack_prob": "DIENGIN", "ann_prob": "ANN", "svm_prob": "SVM", "r
 
 CSS = """
 <style>
-.block-container { max-width: 1460px; padding: 1.05rem 2rem 1.5rem; }
+.block-container { max-width: 1460px; padding: 3.7rem 2rem 1.5rem; }
 [data-testid="stVerticalBlock"] { gap: .65rem; }
 [data-testid="stHorizontalBlock"] { gap: 1rem; }
 [data-testid="stHeadingWithActionElements"] h3 { font-size: 1.08rem; padding: .15rem 0 .3rem; }
@@ -83,7 +83,7 @@ CSS = """
 .dg-summary { display:flex; gap:1.2rem; flex-wrap:wrap; font-size:.77rem; margin:.35rem 0; }
 .dg-footer { font-size:.7rem; opacity:.65; border-top:1px solid rgba(128,128,128,.2); padding-top:.7rem; margin-top:.8rem; }
 @media(max-width: 740px) {
-    .block-container { padding:.7rem .9rem 1.3rem; }
+    .block-container { padding:3.7rem .9rem 1.3rem; }
     .dg-brand h1 { font-size:1.25rem; }
     .dg-brand p { font-size:.7rem; }
     .dg-weather { grid-template-columns:repeat(2,minmax(0,1fr)); }
@@ -271,8 +271,10 @@ def draw_chart(frame, fields, ylabel, key, percent=False, threshold=None, height
             "encoding": {"y": {"field": "ambang", "type": "quantitative"},
                          "tooltip": [{"field": "ambang", "title": "Ambang (%)", "format": ".2f"}]},
         })
+    # Define the shared x-scale interaction on one layer only. Duplicating it
+    # across line/point layers produces duplicate Vega signals in the browser.
+    layers[0]["params"] = [{"name": "zoom", "select": {"type": "interval", "encodings": ["x"]}, "bind": "scales"}]
     spec = {"height": height, "layer": layers,
-            "params": [{"name": "zoom", "select": {"type": "interval", "encodings": ["x"]}, "bind": "scales"}],
             "config": {"view": {"stroke": None}, "axis": {"gridOpacity": .13, "labelFontSize": 11},
                        "legend": {"labelFontSize": 11}}}
     st.vega_lite_chart(data, spec, width="stretch", key=key)
