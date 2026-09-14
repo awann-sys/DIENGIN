@@ -9,26 +9,15 @@ import urllib.request
 import pandas as pd
 import streamlit as st
 
-# Import the existing UI refinement layer first. It patches app_base's
-# lower-panel renderers and CSS without changing the data/model pipeline.
+# Import UI refinement layer first; it patches app_base renderers/CSS.
 import app_ui  # noqa: F401
 import app_base as base
 
 BMKG_ADM4 = "33.04.16.2008"
-BMKG_API_URL = (
-    "https://api.bmkg.go.id/publik/prakiraan-cuaca?adm4=" + BMKG_ADM4
-)
+BMKG_API_URL = f"https://api.bmkg.go.id/publik/prakiraan-cuaca?adm4={BMKG_ADM4}"
 
 BMKG_CSS = """
 <style>
-.dg-bmkg-pill {
-    background: rgba(34,184,167,.08);
-    border-color: rgba(34,184,167,.34);
-    color: inherit;
-    font-size: .92rem;
-    font-weight: 600;
-    padding: .42rem .85rem;
-}
 .dg-bmkg-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -83,9 +72,7 @@ BMKG_CSS = """
     font-size: .94rem;
     line-height: 1.6;
 }
-.dg-bmkg-hero strong {
-    font-size: 1.18rem;
-}
+.dg-bmkg-hero strong { font-size: 1.18rem; }
 .dg-bmkg-source {
     font-size: .82rem;
     opacity: .72;
@@ -102,22 +89,20 @@ BMKG_CSS = """
 }
 </style>
 """
-
 base.CSS += BMKG_CSS
-base.CSS = base.CSS
 
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def fetch_bmkg_forecast():
-    """Fetch the official BMKG public forecast for Dieng Kulon."""
-    req = urllib.request.Request(
+    """Fetch official BMKG public forecast for Dieng Kulon."""
+    request = urllib.request.Request(
         BMKG_API_URL,
         headers={
             "User-Agent": "DIENGIN/1.0 (+https://github.com/awann-sys/DIENGIN)",
             "Accept": "application/json",
         },
     )
-    with urllib.request.urlopen(req, timeout=12) as response:
+    with urllib.request.urlopen(request, timeout=12) as response:
         payload = json.loads(response.read().decode("utf-8"))
     if not isinstance(payload, dict):
         raise ValueError("Respons BMKG bukan objek JSON.")
@@ -247,10 +232,12 @@ def render_bmkg_forecast(now):
                     f'Jarak pandang {base.esc(row.get("vs_text") or "—")}</div>'
                     '</div>'
                 )
-            st.markdown('<div class="dg-bmkg-grid">' + "".join(cards) + "</div>", unsafe_allow_html=True)
+            st.markdown(
+                '<div class="dg-bmkg-grid">' + "".join(cards) + "</div>",
+                unsafe_allow_html=True,
+            )
 
-    analysis_date = rows[0].get("analysis_date")
-    analysis = base.stamp(analysis_date)
+    analysis = base.stamp(rows[0].get("analysis_date"))
     analysis_text = base.time_label(analysis) if not pd.isna(analysis) else "—"
     st.markdown(
         f'<div class="dg-bmkg-source">Sumber data: BMKG · '
@@ -295,7 +282,6 @@ def dashboard():
     st.markdown(
         f'<div class="dg-strip">'
         f'<span class="dg-pill {pill}"><i class="dg-dot"></i>{base.esc(fresh_text)}</span>'
-        f'<span class="dg-pill dg-bmkg-pill">🌦️ Prediksi BMKG</span>'
         f'<span class="dg-muted">{base.esc(base.time_label(latest.get("time_wib")))} · '
         f'{base.esc(base.age_label(age))}</span></div>',
         unsafe_allow_html=True,
