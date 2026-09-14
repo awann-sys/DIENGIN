@@ -13,7 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/upload-artifact@v4
+      - name: Package current model files for local interpolation test
+        uses: actions/upload-artifact@v4
         with:
           name: diengin-test-package
           path: models/
