@@ -9,7 +9,9 @@ from pathlib import Path
 import pandas as pd
 from streamlit.testing.v1 import AppTest
 
-SOURCE = Path(__file__).resolve().parents[1] / "app.py"
+ROOT = Path(__file__).resolve().parents[1]
+SOURCE = ROOT / "app.py"
+BASE = ROOT / "app_base.py"
 
 
 def write_fixture(root):
@@ -62,6 +64,7 @@ class DashboardTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
         shutil.copyfile(SOURCE, self.root / "app.py")
+        shutil.copyfile(BASE, self.root / "app_base.py")
         self.monitor, self.pred = write_fixture(self.root)
         spec = importlib.util.spec_from_file_location("dashboard_under_test", self.root / "app.py")
         self.app = importlib.util.module_from_spec(spec)
