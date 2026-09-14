@@ -57,6 +57,8 @@ with tempfile.TemporaryDirectory() as tmp:
                         preview.save(buffer, format="JPEG", quality=70)
                         print(f"UI_PREVIEW:{device}:" + base64.b64encode(buffer.getvalue()).decode(), flush=True)
                     assert page.locator('[data-testid="stVegaLiteChart"]').first.is_visible(), "Chart did not render"
+                    rendered_labels = page.locator('.vega-embed svg text').all_text_contents()
+                    assert not any("NaN" in label for label in rendered_labels), rendered_labels
                     assert page.locator('[data-testid="stException"]').count() == 0
                     assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 2"), "Horizontal page overflow"
                     brand_bounds = page.locator(".dg-brand").bounding_box()

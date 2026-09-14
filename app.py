@@ -249,7 +249,7 @@ def draw_chart(frame, fields, ylabel, key, percent=False, threshold=None, height
         return
     encoding = {
         "x": {"field": "instant", "type": "temporal", "scale": {"type": "utc"},
-              "axis": {"title": None, "labelExpr": "utcFormat(datum.value + 25200000, '%d/%m %H:%M')",
+              "axis": {"title": None, "labelExpr": "utcFormat(toNumber(datum.value) + 25200000, '%d/%m %H:%M')",
                        "labelOverlap": True, "tickCount": 5}},
         "y": {"field": "Nilai", "type": "quantitative", "title": ylabel,
               "scale": {"domain": [0, 100], "clamp": True} if percent else {"zero": False}},
