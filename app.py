@@ -16,6 +16,15 @@ import app_base as base
 ALIGNMENT_CSS = """
 <style>
 /* =========================================================
+   TOP SUMMARY — BOTTOM EDGE ALIGNMENT
+   ========================================================= */
+@media(min-width: 1001px) {
+    .dg-forecast {
+        min-height: 340px !important;
+    }
+}
+
+/* =========================================================
    LOWER SUMMARY PANELS — SHARED GRID
    ========================================================= */
 .st-key-weather_panel,
