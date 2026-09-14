@@ -1,811 +1,632 @@
 #!/usr/bin/env python3
+"""DIENGIN: compact, read-only AWS and frost prediction dashboard.
+
+Run: streamlit run app.py
+Reads existing pipeline outputs; never downloads AWS data or runs the models.
 """
-DIENGIN - Dashboard v2
-Sistem Monitoring dan Prediksi Embun Beku Dieng
-
-Dashboard ini:
-- hanya membaca output pipeline;
-- tidak mengunduh data;
-- tidak menjalankan model;
-- tidak melakukan retraining.
-
-Jalankan:
-    streamlit run app.py
-"""
-
 from __future__ import annotations
 
+import html
 import json
+import math
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 import streamlit as st
 
+ROOT = Path(__file__).resolve().parent
+WIB = "Asia/Jakarta"
+MONTHS = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"]
+COLORS = ["#22b8a7", "#879cf5", "#e8ad58", "#df83b5"]
+MON_LABELS = {
+    "tt_air_avg": "Suhu udara (°C)", "tt_air_min": "Suhu minimum observasi (°C)",
+    "tmin_min_1h": "Suhu minimum 1 jam (°C)", "rh_avg": "Kelembapan (%)",
+    "ws_avg": "Angin observasi", "ws_mean_1h": "Angin rata-rata 1 jam",
+    "dew_point_c": "Titik embun (°C)", "rr": "Pembacaan hujan AWS (mm)",
+    "pp_air": "Tekanan (hPa)", "wd_avg": "Arah angin (°)",
+}
+PROB_LABELS = {"stack_prob": "DIENGIN", "ann_prob": "ANN", "svm_prob": "SVM", "rf_prob": "Random Forest"}
 
-# ============================================================
-# 0. KONFIGURASI
-# ============================================================
-
-PROJECT_ROOT = Path(__file__).resolve().parent
-OUTPUT_DIR = PROJECT_ROOT / "output"
-HISTORY_DIR = PROJECT_ROOT / "data" / "history"
-
-MONITORING_JSON = OUTPUT_DIR / "monitoring_latest.json"
-PREDICTION_JSON = OUTPUT_DIR / "prediction_latest.json"
-PIPELINE_JSON = OUTPUT_DIR / "pipeline_status.json"
-
-MONITORING_HISTORY = HISTORY_DIR / "monitoring_history.csv"
-RELEASE_HISTORY = HISTORY_DIR / "prediction_release_history.csv"
-NIGHT_HISTORY = HISTORY_DIR / "prediction_night_history.csv"
-
-st.set_page_config(
-    page_title="DIENGIN",
-    page_icon="❄️",
-    layout="wide",
-    initial_sidebar_state="auto",
-)
-
-
-# ============================================================
-# 1. STYLE
-# ============================================================
-
-st.markdown(
-    """
-    <style>
-    .block-container {
-        max-width: 1280px;
-        padding-top: 2rem;
-        padding-bottom: 3rem;
-    }
-    .diengin-hero {
-        background: linear-gradient(120deg, #102f43, #145b68);
-        color: #ffffff;
-        border-radius: 1.25rem;
-        padding: 1.6rem 1.8rem;
-        margin-bottom: 1.4rem;
-    }
-    .diengin-hero h1 { color: #ffffff; padding: 0; font-size: 2.5rem; }
-    .diengin-hero p { color: #e0f2f1; margin: .4rem 0 0; }
-    .diengin-eyebrow {
-        text-transform: uppercase; letter-spacing: .14em;
-        font-size: .75rem; font-weight: 600; margin-bottom: .5rem;
-    }
-    [data-testid="stMetric"] { border-radius: 1rem; padding: 1rem; }
-    [data-testid="stMetricValue"] {
-        font-size: clamp(1.3rem, 2.4vw, 2rem);
-        font-variant-numeric: tabular-nums;
-    }
-    [data-testid="stMetricLabel"] { font-weight: 500; }
-    @media (max-width: 640px) {
-        .block-container { padding: 1rem 1rem 2rem; }
-        .diengin-hero { padding: 1.25rem; }
-        .diengin-hero h1 { font-size: 2rem; }
-        [data-testid="stMetric"] { padding: .8rem; }
-    }
-
-    .diengin-subtitle {
-        color: rgba(120,120,120,0.95);
-        font-size: 0.95rem;
-        margin-top: -0.65rem;
-        margin-bottom: 1rem;
-    }
-
-    .status-box {
-        border: 1px solid rgba(128,128,128,0.25);
-        border-radius: 0.8rem;
-        padding: 0.8rem 1rem;
-        margin-bottom: 0.8rem;
-    }
-
-    .small-note {
-        font-size: 0.83rem;
-        color: rgba(120,120,120,0.95);
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+CSS = """
+<style>
+.block-container { max-width: 1460px; padding: 1.05rem 2rem 1.5rem; }
+[data-testid="stVerticalBlock"] { gap: .65rem; }
+[data-testid="stHorizontalBlock"] { gap: 1rem; }
+[data-testid="stHeadingWithActionElements"] h3 { font-size: 1.08rem; padding: .15rem 0 .3rem; }
+[data-testid="stCaptionContainer"] p { font-size: .79rem; line-height: 1.5; }
+[data-testid="stTabs"] [role="tablist"] { gap: 1.3rem; }
+[data-testid="stTabs"] [role="tab"] { font-size: .88rem; padding: .5rem 0; }
+[data-testid="stBaseButton-secondary"], [data-testid="stBaseButton-primary"] { border-radius: .65rem; }
+.dg-brand { display:flex; align-items:center; gap:.7rem; padding:.2rem 0; }
+.dg-mark { display:grid; place-items:center; width:40px; height:40px; border-radius:12px;
+    background:rgba(34,184,167,.14); color:#22b8a7; font-size:27px; flex-shrink:0; }
+.dg-brand h1 { font-size:1.45rem; line-height:1.15; padding:0; margin:0; letter-spacing:.04em; }
+.dg-brand p { font-size:.77rem; margin:.15rem 0 0; opacity:.7; }
+.dg-strip { display:flex; align-items:center; flex-wrap:wrap; gap:.4rem 1rem;
+    font-size:.77rem; padding:.2rem 0 .45rem; }
+.dg-muted { opacity:.72; }
+.dg-pill { border-radius:50px; padding:.25rem .65rem; font-size:.71rem;
+    display:inline-flex; align-items:center; gap:.35rem; border:1px solid rgba(128,128,128,.25); }
+.dg-dot { width:7px; height:7px; border-radius:50%; background:currentColor; display:inline-block; }
+.dg-fresh { color:#168b7c; background:rgba(34,184,167,.10); }
+.dg-old { color:inherit; background:rgba(232,173,88,.12); border-color:rgba(232,173,88,.5); }
+.dg-card { background:var(--secondary-background-color, #18212c);
+    border:1px solid rgba(128,128,128,.19); border-radius:16px; padding:1.1rem; }
+.dg-forecast { border-top:3px solid #22b8a7; min-height:264px; }
+.dg-forecast.alert { border-top-color:#e8ad58; }
+.dg-forecast h2 { font-size:1.04rem; line-height:1.4; margin:.65rem 0 .3rem; padding:0; }
+.dg-eyebrow { font-size:.69rem; font-weight:600; letter-spacing:.08em; text-transform:uppercase; opacity:.7; }
+.dg-score { font-size:3.3rem; font-weight:650; line-height:1.1; letter-spacing:-.055em; margin:.6rem 0 .15rem; font-variant-numeric:tabular-nums; }
+.dg-score small { font-size:1.4rem; font-weight:500; margin-left:.15rem; }
+.dg-meta { font-size:.74rem; line-height:1.5; opacity:.75; }
+.dg-pair { display:flex; justify-content:space-between; flex-wrap:wrap; gap:.4rem; margin-top:.65rem; font-size:.73rem; }
+.dg-meter { position:relative; height:7px; border-radius:6px; background:rgba(128,128,128,.19); margin:.8rem 0 .3rem; }
+.dg-fill { height:7px; border-radius:6px; background:#22b8a7; }
+.dg-threshold { position:absolute; width:2px; height:13px; top:-3px; background:#e8ad58; }
+.dg-weather { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.65rem; }
+.dg-weather .dg-card { padding:.9rem 1rem; min-height:116px; }
+.dg-label { font-size:.75rem; opacity:.78; }
+.dg-value { font-size:1.9rem; line-height:1.2; font-weight:620; margin:.35rem 0 .2rem;
+    font-variant-numeric:tabular-nums; letter-spacing:-.03em; }
+.dg-unit { font-size:.83rem; font-weight:400; opacity:.75; margin-left:.25rem; }
+.dg-delta { font-size:.70rem; opacity:.7; }
+.dg-info { border-left:3px solid rgba(34,184,167,.6); padding:.5rem .75rem; margin:.2rem 0;
+    background:rgba(34,184,167,.06); font-size:.78rem; line-height:1.5; border-radius:0 8px 8px 0; }
+.dg-info.warn { border-left-color:#e8ad58; background:rgba(232,173,88,.07); }
+.dg-release-row { display:grid; grid-template-columns:repeat(11,minmax(0,1fr)); gap:5px; margin:.5rem 0; }
+.dg-release { text-align:center; border-radius:8px; padding:.5rem .1rem;
+    font-size:.65rem; border:1px solid rgba(128,128,128,.22); }
+.dg-release b { display:block; font-size:.72rem; margin-top:.25rem; }
+.dg-release.has { background:rgba(34,184,167,.1); border-color:rgba(34,184,167,.35); }
+.dg-release.hit { background:rgba(232,173,88,.13); border-color:#e8ad58; }
+.dg-summary { display:flex; gap:1.2rem; flex-wrap:wrap; font-size:.77rem; margin:.35rem 0; }
+.dg-footer { font-size:.7rem; opacity:.65; border-top:1px solid rgba(128,128,128,.2); padding-top:.7rem; margin-top:.8rem; }
+@media(max-width: 740px) {
+    .block-container { padding:.7rem .9rem 1.3rem; }
+    .dg-brand h1 { font-size:1.25rem; }
+    .dg-brand p { font-size:.7rem; }
+    .dg-weather { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .dg-weather .dg-card { min-height:100px; padding:.8rem; }
+    .dg-score { font-size:2.8rem; }
+    .dg-forecast { min-height:0; }
+    .dg-value { font-size:1.7rem; }
+    .dg-release-row { grid-template-columns:repeat(6,minmax(0,1fr)); }
+    [data-testid="stTabs"] [role="tablist"] { gap:1rem; }
+}
+</style>
+"""
 
 
-# ============================================================
-# 2. HELPER
-# ============================================================
+def esc(value):
+    return html.escape(str(value), quote=True)
 
-def read_json(path: Path) -> dict | None:
-    if not path.is_file() or path.stat().st_size == 0:
-        return None
 
+def number(value):
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
+        result = float(value)
+        return result if math.isfinite(result) else None
+    except (TypeError, ValueError):
         return None
 
 
-def read_csv(path: Path) -> pd.DataFrame:
-    if not path.is_file() or path.stat().st_size == 0:
-        return pd.DataFrame()
-
-    try:
-        return pd.read_csv(path)
-    except Exception:
-        return pd.DataFrame()
+def fmt(value, places=1):
+    value = number(value)
+    return "—" if value is None else f"{value:.{places}f}".replace(".", ",")
 
 
-def fmt_float(value, decimals=2, suffix=""):
-    if value is None or pd.isna(value):
-        return "—"
-    return f"{float(value):.{decimals}f}{suffix}"
+def probability(value):
+    value = number(value)
+    return value if value is not None and 0 <= value <= 1 else None
 
 
-def fmt_probability(value):
-    if value is None or pd.isna(value):
-        return "—"
-    return f"{float(value) * 100:.2f}%"
+def pct(value):
+    value = probability(value)
+    return "—" if value is None else fmt(value * 100) + "%"
 
 
-def parse_datetime(value):
-    if value in (None, "", "null"):
+def truth(value):
+    return str(value).strip().lower() in {"true", "1", "yes"}
+
+
+def stamp(value):
+    if value is None or str(value).strip() in {"", "null", "NaT", "nan"}:
         return pd.NaT
-    return pd.to_datetime(value, errors="coerce")
+    try:
+        dt = pd.Timestamp(value)
+        if pd.isna(dt):
+            return pd.NaT
+        return dt.tz_localize(WIB) if dt.tzinfo is None else dt.tz_convert(WIB)
+    except (ValueError, TypeError, OverflowError):
+        return pd.NaT
 
 
-def fmt_wib(value, include_date=True):
-    dt = parse_datetime(value)
+def date_label(value):
+    dt = stamp(value)
+    return "—" if pd.isna(dt) else f"{dt.day:02d} {MONTHS[dt.month - 1]} {dt.year}"
+
+
+def time_label(value, short=False):
+    dt = stamp(value)
     if pd.isna(dt):
         return "—"
-
-    if include_date:
-        return dt.strftime("%d %b %Y, %H:%M WIB")
-    return dt.strftime("%H:%M WIB")
+    return ("" if short else date_label(dt) + ", ") + dt.strftime("%H:%M") + " WIB"
 
 
-def normalize_status(value):
-    if value is None:
-        return "unknown"
-    return str(value).strip().lower()
+def freshness(value, now):
+    dt = stamp(value)
+    if pd.isna(dt):
+        return "unknown", "Waktu belum tersedia", None
+    age = (now - dt).total_seconds() / 60
+    # Match src/monitoring.py operational thresholds, evaluated at display time.
+    if age < -5:
+        return "future", "Waktu data tidak sesuai", age
+    if age <= 30:
+        return "current", "Data terkini", age
+    if age <= 60:
+        return "delayed", "Data terlambat", age
+    return "stale", "Data lama", age
 
 
-def status_icon(value):
-    value = normalize_status(value)
-
-    mapping = {
-        "success": "✅",
-        "valid": "✅",
-        "current": "🟢",
-        "partial": "🟡",
-        "delayed": "🟠",
-        "stale": "🔴",
-        "invalid": "🔴",
-        "error": "🔴",
-        "missing": "⚪",
-        "unknown": "⚪",
-        "future_timestamp": "🔴",
-    }
-    return mapping.get(value, "⚪")
+def age_label(age):
+    if age is None or age < -5:
+        return "—"
+    if age < 60:
+        return f"{max(0, int(age))} menit lalu"
+    if age < 1440:
+        return f"{age / 60:.1f}".replace(".", ",") + " jam lalu"
+    return f"{int(age / 1440)} hari lalu"
 
 
-def prediction_text(prediction_value, complete=False):
-    if prediction_value is None or pd.isna(prediction_value):
-        return "Belum tersedia"
+@st.cache_data(max_entries=24, show_spinner=False)
+def cached_file(path, modified_ns, size, kind):
+    # mtime/size are cache keys; failed reads are retried on the next file change.
+    if kind == "json":
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            raise ValueError("Expected a JSON object")
+        return data
+    return pd.read_csv(path)
 
+
+def read_file(relative, kind="json"):
+    path = ROOT / relative
     try:
-        prediction_value = int(prediction_value)
-    except Exception:
-        return "Belum tersedia"
+        info = path.stat()
+        if info.st_size == 0:
+            return ({} if kind == "json" else pd.DataFrame()), "empty"
+        return cached_file(str(path), info.st_mtime_ns, info.st_size, kind), "ok"
+    except FileNotFoundError:
+        return ({} if kind == "json" else pd.DataFrame()), "missing"
+    except (OSError, ValueError, pd.errors.ParserError, UnicodeError):
+        return ({} if kind == "json" else pd.DataFrame()), "error"
 
-    if prediction_value == 1:
-        base = "Terindikasi embun beku"
+
+def timed_frame(frame, field):
+    if frame.empty or field not in frame:
+        return pd.DataFrame()
+    out = frame.copy()
+    out["_time"] = out[field].map(stamp)
+    out = out.dropna(subset=["_time"])
+    if out.empty:
+        return out
+    out["_time"] = pd.to_datetime(out["_time"], utc=True).dt.tz_convert(WIB)
+    return out.sort_values("_time").drop_duplicates("_time", keep="last")
+
+
+def window(frame, hours):
+    if frame.empty:
+        return frame
+    return frame.loc[frame["_time"] >= frame["_time"].max() - pd.Timedelta(hours=hours)].copy()
+
+
+def chart_rows(frame, fields, percent=False, gap_minutes=30):
+    """Split lines across missing values and acquisition gaps; do not interpolate."""
+    parts = []
+    for field, label in fields.items():
+        if field not in frame or frame.empty:
+            continue
+        values = pd.to_numeric(frame[field], errors="coerce").replace([math.inf, -math.inf], float("nan"))
+        if percent:
+            values = values.where(values.between(0, 1)) * 100
+        valid = values.notna()
+        gap = frame["_time"].diff().dt.total_seconds().div(60).gt(gap_minutes)
+        segment = ((~valid) | (~valid.shift(1, fill_value=False)) | gap).cumsum()
+        part = pd.DataFrame({
+            "instant": frame["_time"].map(lambda dt: dt.timestamp() * 1000),
+            "Waktu": frame["_time"].map(time_label),
+            "Nilai": values, "Seri": label,
+            "Segmen": label + ":" + segment.astype(str),
+        }).dropna(subset=["Nilai"])
+        parts.append(part)
+    return pd.concat(parts, ignore_index=True) if parts else pd.DataFrame()
+
+
+def draw_chart(frame, fields, ylabel, key, percent=False, threshold=None, height=235):
+    data = chart_rows(frame, fields, percent, gap_minutes=90 if percent else 30)
+    if data.empty:
+        st.info("Belum ada nilai valid untuk grafik ini.")
+        return
+    encoding = {
+        "x": {"field": "instant", "type": "temporal", "scale": {"type": "utc"},
+              "axis": {"title": None, "labelExpr": "utcFormat(datum.value + 25200000, '%d/%m %H:%M')",
+                       "labelOverlap": True, "tickCount": 5}},
+        "y": {"field": "Nilai", "type": "quantitative", "title": ylabel,
+              "scale": {"domain": [0, 100], "clamp": True} if percent else {"zero": False}},
+        "color": {"field": "Seri", "type": "nominal",
+                  "scale": {"domain": list(fields.values()), "range": COLORS[:len(fields)]},
+                  "legend": {"title": None, "orient": "bottom", "labelLimit": 230}},
+        "tooltip": [{"field": "Waktu"}, {"field": "Seri"},
+                    {"field": "Nilai", "type": "quantitative", "format": ".2f"}],
+    }
+    layers = [
+        {"mark": {"type": "line", "strokeWidth": 2.3},
+         "encoding": {**encoding, "detail": {"field": "Segmen"}}},
+        {"mark": {"type": "point", "filled": True, "size": 24}, "encoding": encoding},
+    ]
+    if probability(threshold) is not None:
+        layers.append({
+            "data": {"values": [{"ambang": threshold * 100}]},
+            "mark": {"type": "rule", "strokeDash": [6, 4], "color": "#e8ad58", "strokeWidth": 1.5},
+            "encoding": {"y": {"field": "ambang", "type": "quantitative"},
+                         "tooltip": [{"field": "ambang", "title": "Ambang (%)", "format": ".2f"}]},
+        })
+    spec = {"height": height, "layer": layers,
+            "params": [{"name": "zoom", "select": {"type": "interval", "encodings": ["x"]}, "bind": "scales"}],
+            "config": {"view": {"stroke": None}, "axis": {"gridOpacity": .13, "labelFontSize": 11},
+                       "legend": {"labelFontSize": 11}}}
+    st.vega_lite_chart(data, spec, width="stretch", key=key)
+
+
+def delta_label(value, unit):
+    value = number(value)
+    if value is None:
+        return "Tren 1 jam belum tersedia"
+    direction = "Turun" if value < 0 else "Naik" if value > 0 else "Tetap"
+    return f"{direction} {fmt(abs(value))} {unit} · ±1 jam"
+
+
+def weather_card(label, value, unit="", note=""):
+    return (f'<div class="dg-card"><div class="dg-label">{esc(label)}</div>'
+            f'<div class="dg-value">{esc(fmt(value))}<span class="dg-unit">{esc(unit)}</span></div>'
+            f'<div class="dg-delta">{esc(note)}</div></div>')
+
+
+def render_weather(monitor):
+    latest = monitor.get("latest_observation") or {}
+    params = latest.get("parameters") or {}
+    trend = monitor.get("trend_1h") or {}
+    usable = monitor.get("status") == "success"
+    if not usable:
+        params, trend = {}, {}
+    cards = [
+        weather_card("Suhu udara", params.get("tt_air_avg"), "°C", delta_label(trend.get("tt_air_avg_change"), "°C")),
+        weather_card("Minimum observasi", params.get("tt_air_min"), "°C", "Minimum pada observasi terakhir"),
+        weather_card("Kelembapan", params.get("rh_avg"), "%", "Belum tersedia / tidak lolos QC" if number(params.get("rh_avg")) is None else delta_label(trend.get("rh_avg_change"), "poin %")),
+        weather_card("Kecepatan angin", params.get("ws_avg"), "", delta_label(trend.get("ws_avg_change"), "unit AWS")),
+        weather_card("Titik embun", params.get("dew_point_c"), "°C", "Belum tersedia" if number(params.get("dew_point_c")) is None else "Suhu saat udara mencapai jenuh"),
+        weather_card("Pembacaan hujan", params.get("rr"), "mm", "Nilai AWS · bukan intensitas per jam"),
+    ]
+    st.markdown('<div class="dg-weather">' + "".join(cards) + "</div>", unsafe_allow_html=True)
+    st.caption(f"Tekanan {fmt(params.get('pp_air'))} hPa · Arah angin {fmt(params.get('wd_avg'), 0)}° · Satuan kecepatan angin mengikuti sumber AWS.")
+
+
+def prediction_state(pred, now):
+    pmax = probability(pred.get("probability_max_so_far"))
+    flag = number(pred.get("prediction_so_far"))
+    valid = pred.get("status") == "success" and pmax is not None and flag in (0, 1)
+    target = stamp(pred.get("target_night_date"))
+    current_target = now.normalize() + (pd.Timedelta(days=1) if now.hour >= 19 else pd.Timedelta(0))
+    archived = not pd.isna(target) and target.normalize() < current_target
+    source_state = freshness(pred.get("latest_observation_wib"), now)[0]
+    ended = not pd.isna(target) and now >= target.normalize() + pd.Timedelta(hours=7)
+    if not valid:
+        label = "Prediksi belum tersedia"
+    elif flag == 1:
+        label = "Terindikasi embun beku"
     else:
-        base = "Belum terindikasi embun beku"
-
-    if complete:
-        return base
-    return f"{base} (sementara)"
-
-
-def safe_bool(value):
-    if isinstance(value, bool):
-        return value
-    if value is None or pd.isna(value):
-        return False
-    if isinstance(value, str):
-        return value.strip().lower() in {"true", "1", "yes", "y"}
-    return bool(value)
+        label = "Belum terindikasi embun beku"
+    status = "Arsip prediksi" if archived else "Periode rilis selesai" if ended else "Prediksi sementara"
+    return {"valid": valid, "label": label, "status": status, "archived": archived,
+            "source_state": source_state, "pmax": pmax, "flag": flag}
 
 
-# ============================================================
-# 3. SIDEBAR
-# ============================================================
-
-with st.sidebar:
-    st.markdown("## ❄️ DIENGIN")
-    st.caption("Monitoring & Prediksi Embun Beku Dieng")
-
-    st.divider()
-
-    if st.button("🔄 Muat ulang dashboard", width="stretch"):
-        st.rerun()
-
+def render_forecast(pred, now):
+    state = prediction_state(pred, now)
+    threshold = probability(pred.get("threshold_stacked"))
+    release = pred.get("latest_release") or {}
+    available = number(pred.get("releases_available"))
+    expected = number(pred.get("releases_expected"))
+    count = f"{int(available)}/{int(expected)}" if available is not None and expected else "—"
+    score = fmt(state["pmax"] * 100) if state["valid"] else "—"
+    latest_score = pct(release.get("stacked_probability")) if state["valid"] else "—"
+    extra = " · data input lama" if state["source_state"] in {"stale", "delayed"} else ""
+    alert = " alert" if state["flag"] == 1 or state["archived"] else ""
+    meter = ""
+    if state["valid"]:
+        marker = "" if threshold is None else f'<span class="dg-threshold" style="left:{threshold * 100:.4f}%"></span>'
+        meter = f'<div class="dg-meter"><div class="dg-fill" style="width:{state["pmax"] * 100:.4f}%"></div>{marker}</div>'
     st.markdown(
-        """
-        <div class="small-note">
-        Pantau kondisi AWS dan perkembangan prediksi embun beku.
-        Waktu observasi menunjukkan kapan pengukuran dilakukan.
-        </div>
-        """,
+        f'<div class="dg-card dg-forecast{alert}"><div class="dg-eyebrow">Prediksi embun beku</div>'
+        f'<h2>{esc(state["label"])}</h2><div class="dg-meta">Target {esc(date_label(pred.get("target_night_date")))}</div>'
+        f'<div class="dg-score">{esc(score)}<small>%</small></div>'
+        f'<div class="dg-meta">Probabilitas maksimum dari rilis tersedia</div>{meter}'
+        f'<div class="dg-pair"><span>Ambang <b>{esc(pct(threshold))}</b></span><span>Rilis <b>{count}</b></span></div>'
+        f'<div class="dg-pair"><span>Rilis terakhir <b>{esc(latest_score)}</b></span>'
+        f'<span>{esc(time_label(release.get("release_time_wib"), True))}</span></div>'
+        f'<div class="dg-meta" style="margin-top:.6rem">{esc(state["status"] + extra)}</div></div>',
         unsafe_allow_html=True,
     )
 
-    st.divider()
-    st.caption("Pembaruan tampilan otomatis setiap 15 menit selama dashboard terbuka.")
-    st.caption("Data baru mengikuti hasil pembaruan sistem yang berhasil.")
-    history_hours = st.selectbox(
-        "Periode grafik monitoring",
-        options=[6, 12, 24, 48],
-        index=2,
-        format_func=lambda hours: f"{hours} jam terakhir",
-    )
 
-
-# ============================================================
-# 4. DASHBOARD
-# ============================================================
-
-st.markdown(
-    """
-    <div class="diengin-hero">
-        <div class="diengin-eyebrow">Pemantauan cuaca · Dataran Tinggi Dieng</div>
-        <h1>❄️ DIENGIN</h1>
-        <p>Monitoring cuaca dan prediksi embun beku dalam satu dashboard.</p>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
-
-
-@st.fragment(run_every="15m")
-def live_dashboard():
-    monitoring = read_json(MONITORING_JSON)
-    prediction = read_json(PREDICTION_JSON)
-    pipeline = read_json(PIPELINE_JSON)
-
-    monitoring_history = read_csv(MONITORING_HISTORY)
-    release_history = read_csv(RELEASE_HISTORY)
-    night_history = read_csv(NIGHT_HISTORY)
-
-    # --------------------------------------------------------
-    # A. STATUS SISTEM
-    # --------------------------------------------------------
-
-    pipeline_status = normalize_status(
-        pipeline.get("status") if pipeline else None
-    )
-    monitoring_status = normalize_status(
-        monitoring.get("monitoring_status") if monitoring else None
-    )
-
-    latest_obs = (
-        monitoring.get("latest_observation", {})
-        if monitoring
-        else {}
-    )
-
-    freshness = normalize_status(
-        latest_obs.get("freshness_status")
-    )
-
-    st.caption(f"Observasi AWS: {fmt_wib(latest_obs.get('time_wib'))}")
-    with st.expander("Status data dan sistem", expanded=False):
-        c1, c2, c3, c4 = st.columns(4)
-
-        with c1:
-            st.metric(
-                "Pipeline",
-                f"{status_icon(pipeline_status)} {pipeline_status.upper()}",
-                border=True,
-            )
-
-        with c2:
-            st.metric(
-                "Monitoring",
-                f"{status_icon(monitoring_status)} {monitoring_status.upper()}",
-                border=True,
-            )
-
-        with c3:
-            st.metric(
-                "Keterkinian saat diproses",
-                f"{status_icon(freshness)} {freshness.upper()}",
-                border=True,
-            )
-
-        with c4:
-            data_age = latest_obs.get("data_age_minutes")
-            st.metric(
-                "Umur data saat diproses",
-                fmt_float(data_age, 1, " menit"),
-                border=True,
-            )
-        st.caption(
-            "Status dan umur data dicatat saat pemrosesan terakhir: "
-            + fmt_wib(monitoring.get("generated_at_wib") if monitoring else None)
-        )
-
-    if monitoring is None:
-        st.error(
-            "Data monitoring belum tersedia. "
-            "Coba muat ulang setelah pembaruan sistem berikutnya."
-        )
+def release_strip(releases, target, threshold, now):
+    target_dt = stamp(target)
+    if pd.isna(target_dt):
         return
+    selected = releases.loc[releases["tanggal_target"].astype(str).str[:10] == target_dt.date().isoformat()] if "tanggal_target" in releases else pd.DataFrame()
+    boxes = []
+    for hour in [21, 22, 23, 0, 1, 2, 3, 4, 5, 6, 7]:
+        when = target_dt.normalize() + pd.Timedelta(hours=hour) - (pd.Timedelta(days=1) if hour >= 21 else pd.Timedelta(0))
+        rows = selected.loc[pd.to_numeric(selected["jam_rilis_wib"], errors="coerce") == hour] if "jam_rilis_wib" in selected else pd.DataFrame()
+        p = probability(rows.iloc[-1].get("stack_prob")) if not rows.empty else None
+        css, label = "", "Nanti" if when > now else "—"
+        if p is not None:
+            css = " hit" if threshold is not None and p >= threshold else " has"
+            label = pct(p)
+        title = f"{time_label(when)} · " + (label if p is not None else "Belum ada rilis valid")
+        boxes.append(f'<div class="dg-release{css}" title="{esc(title)}">{hour:02d}<b>{esc(label)}</b></div>')
+    st.markdown('<div class="dg-release-row">' + "".join(boxes) + "</div>", unsafe_allow_html=True)
+    st.caption("Jam rilis WIB · — belum tersedia · garis kuning menandai ambang pada grafik.")
 
-    if monitoring.get("status") != "success":
-        st.error(
-            monitoring.get(
-                "message",
-                "Monitoring terakhir tidak berhasil.",
-            )
-        )
+
+def download_csv(frame, name, key):
+    output = frame.drop(columns=["_time"], errors="ignore").copy()
+    st.download_button("↓ Unduh CSV", output.to_csv(index=False).encode("utf-8-sig"),
+                       file_name=name, mime="text/csv", key=key)
+
+
+def render_trend(mh):
+    title, control = st.columns([2, 1])
+    with title:
+        st.subheader("Jejak cuaca")
+    with control:
+        hours = st.selectbox("Rentang waktu", [6, 12, 24, 48], index=2,
+                            format_func=lambda x: f"{x} jam terakhir", key="trend_hours", label_visibility="collapsed")
+    if mh.empty:
+        st.info("Riwayat monitoring belum tersedia.")
         return
+    subset = window(mh, hours)
+    options = ["Suhu", "Kelembapan", "Angin", "Hujan AWS"]
+    selected = st.radio("Parameter cuaca", options, horizontal=True, key="weather_parameter", label_visibility="collapsed")
+    mapping = {
+        "Suhu": ({"tt_air_avg": "Suhu udara", "tt_air_min": "Minimum observasi"}, "Suhu (°C)"),
+        "Kelembapan": ({"rh_avg": "Kelembapan"}, "RH (%)"),
+        "Angin": ({"ws_avg": "Angin observasi", "ws_mean_1h": "Rata-rata 1 jam"}, "Kecepatan · unit sumber AWS"),
+        "Hujan AWS": ({"rr": "Pembacaan hujan AWS"}, "Pembacaan AWS (mm)"),
+    }
+    fields, ylabel = mapping[selected]
+    draw_chart(subset, fields, ylabel, "weather_chart")
+    st.caption(f"{time_label(subset['_time'].min())} — {time_label(subset['_time'].max())} · {len(subset)} observasi tersimpan")
+    if selected == "Hujan AWS":
+        st.caption("Pembacaan sumber belum dikonversi menjadi intensitas atau total hujan periode pilihan.")
+    elif selected == "Suhu":
+        values = pd.to_numeric(subset.get("tt_air_avg", pd.Series(dtype=float)), errors="coerce")
+        if values.notna().any():
+            st.markdown(f'<div class="dg-summary"><span>Terendah <b>{fmt(values.min())} °C</b></span>'
+                        f'<span>Rata-rata <b>{fmt(values.mean())} °C</b></span><span>Tertinggi <b>{fmt(values.max())} °C</b></span></div>', unsafe_allow_html=True)
+    st.caption("Geser atau zoom untuk menjelajah; klik dua kali untuk reset. Jeda data tidak disambungkan.")
 
-    if freshness in {"stale", "future_timestamp"}:
-        st.warning(
-            "Data AWS tercatat terlambat atau memiliki waktu yang tidak sesuai. "
-            "Interpretasi kondisi terkini dan prediksi perlu dilakukan dengan hati-hati."
-        )
-    elif monitoring_status in {"partial", "invalid"}:
-        st.warning(
-            "Sebagian parameter monitoring tidak tersedia atau tidak lolos "
-            "aturan QC operasional DIENGIN."
-        )
 
-    # --------------------------------------------------------
-    # B. PREDIKSI
-    # --------------------------------------------------------
-    st.subheader("Prediksi Embun Beku")
+def render_prediction_history(rh, nights, pred, now):
+    st.subheader("Perjalanan prediksi")
+    if rh.empty or "tanggal_target" not in rh:
+        st.info("Riwayat rilis belum tersedia.")
+        return
+    dates = sorted(rh["tanggal_target"].dropna().astype(str).str[:10].unique(), reverse=True)
+    if not dates:
+        st.info("Tanggal target belum tersedia.")
+        return
+    target = st.selectbox("Tanggal target prediksi", dates, format_func=date_label, key="prediction_date")
+    selected = rh.loc[rh["tanggal_target"].astype(str).str[:10] == target]
+    threshold = None
+    if str(pred.get("target_night_date"))[:10] == target:
+        threshold = probability(pred.get("threshold_stacked"))
+    elif "tanggal_target" in nights:
+        summary = nights.loc[nights["tanggal_target"].astype(str).str[:10] == target]
+        if not summary.empty:
+            threshold = probability(summary.iloc[-1].get("ambang_final"))
+    release_strip(selected, target, threshold, now)
+    draw_chart(selected, {"stack_prob": "DIENGIN"}, "Probabilitas (%)", "release_chart", True, threshold)
+    st.caption(f"Ambang target {pct(threshold)} · probabilitas per rilis, bukan observasi kejadian frost.")
+    with st.expander("Bandingkan model"):
+        draw_chart(selected, PROB_LABELS, "Probabilitas (%)", "models_chart", True)
+        st.caption("ANN, SVM, dan Random Forest adalah model dasar. DIENGIN menampilkan hasil stacking; nilainya bukan rata-rata sederhana.")
+    with st.expander("Tabel rilis dan unduhan"):
+        table = selected.drop(columns=["_time"], errors="ignore").copy()
+        cols = [c for c in ["waktu_rilis_wib", "stack_prob", "ann_prob", "svm_prob", "rf_prob", "status_data_rilis"] if c in table]
+        table = table[cols]
+        for col in PROB_LABELS:
+            if col in table:
+                table[col] = (pd.to_numeric(table[col], errors="coerce") * 100).round(2)
+        table = table.rename(columns={**{k: v + " (%)" for k, v in PROB_LABELS.items()},
+                                     "waktu_rilis_wib": "Rilis (WIB)", "status_data_rilis": "Status data"})
+        st.dataframe(table, hide_index=True, width="stretch")
+        download_csv(selected, f"diengin_rilis_{target}.csv", "release_csv")
+        st.caption("CSV mempertahankan probabilitas asli pada skala 0–1.")
 
-    if prediction is None:
-        st.info(
-            "Prediksi belum tersedia. Menunggu hasil pembaruan sistem."
-        )
-    elif prediction.get("status") != "success":
-        st.warning(
-            prediction.get(
-                "message",
-                "Prediksi terbaru belum tersedia.",
-            )
-        )
+
+def render_explore(mh, nights):
+    st.subheader("Eksplorasi observasi")
+    if mh.empty:
+        st.info("Belum ada arsip monitoring untuk dijelajahi.")
     else:
-        threshold = prediction.get("threshold_stacked")
-        pmax = prediction.get("probability_max_so_far")
-        latest_release = prediction.get("latest_release") or {}
-        latest_prob = latest_release.get("stacked_probability")
-        prediction_value = prediction.get("prediction_so_far")
-        night_complete = safe_bool(prediction.get("night_complete"))
-        available = prediction.get("releases_available")
-        expected = prediction.get("releases_expected")
-
-        st.caption(
-            f"Tanggal target: {prediction.get('target_night_date') or '—'}"
-            f" · Rilis terakhir: {fmt_wib(latest_release.get('release_time_wib'))}"
-        )
-        pred_label = prediction_text(prediction_value, complete=night_complete)
-        if prediction_value == 1:
-            st.warning(f"**{pred_label}**")
-        elif prediction_value == 0:
-            st.success(f"**{pred_label}**")
+        first, last = mh["_time"].min().date(), mh["_time"].max().date()
+        dates = st.date_input("Rentang tanggal observasi (WIB)", (last, last),
+                              min_value=first, max_value=last, key="explore_dates")
+        if not isinstance(dates, (tuple, list)) or len(dates) != 2:
+            st.info("Pilih tanggal awal dan tanggal akhir.")
         else:
-            st.info("**Prediksi malam belum tersedia.**")
-
-        p1, p2, p3, p4 = st.columns(4)
-
-        with p1:
-            st.metric(
-                "Probabilitas rilis terakhir",
-                fmt_probability(latest_prob),
-                border=True,
-            )
-
-        with p2:
-            st.metric(
-                "Probabilitas maksimum",
-                fmt_probability(pmax),
-                border=True,
-            )
-
-        with p3:
-            st.metric(
-                "Ambang klasifikasi",
-                fmt_probability(threshold),
-                border=True,
-            )
-
-        with p4:
-            st.metric(
-                "Rilis tersedia",
-                (
-                    f"{available}/{expected}"
-                    if available is not None and expected is not None
-                    else "—"
-                ),
-                border=True,
-            )
-
-        if not night_complete:
-            st.caption(
-                f"Prediksi sementara: {available or 0} dari {expected or '—'} "
-                "rilis tersedia. Hasil dapat berubah pada rilis berikutnya."
-            )
-
-        if pmax is not None:
-            progress_value = min(max(float(pmax), 0.0), 1.0)
-            st.progress(
-                progress_value,
-                text=(
-                    f"Probabilitas maksimum dari rilis tersedia {progress_value * 100:.2f}% "
-                    f"· ambang {float(threshold) * 100:.2f}%"
-                    if threshold is not None
-                    else f"Probabilitas maksimum dari rilis tersedia {progress_value * 100:.2f}%"
-                ),
-            )
-
-    # --------------------------------------------------------
-    # C. MONITORING TERKINI
-    # --------------------------------------------------------
-    st.subheader("Monitoring AWS Terkini")
-
-    station = monitoring.get("station") or {}
-    params = latest_obs.get("parameters") or {}
-    source_values = latest_obs.get("source_values") or {}
-    adapter = latest_obs.get("operational_adapter") or {}
-    trend = monitoring.get("trend_1h") or {}
-
-    st.caption(
-        f"Observasi terbaru: **{fmt_wib(latest_obs.get('time_wib'))}**"
-        + (
-            f" · {station.get('station_name')}"
-            if station.get("station_name")
-            else ""
-        )
-    )
-
-    m1, m2, m3, m4 = st.columns(4)
-
-    with m1:
-        st.metric(
-            "Suhu udara",
-            fmt_float(params.get("tt_air_avg"), 2, " °C"),
-            delta_color="off",
-            delta=(
-                fmt_float(trend.get("tt_air_avg_change"), 2, " °C / ~1 jam")
-                if trend.get("tt_air_avg_change") is not None
-                else None
-            ),
-            border=True,
-        )
-
-    with m2:
-        st.metric(
-            "Suhu minimum observasi",
-            fmt_float(params.get("tt_air_min"), 2, " °C"),
-            delta_color="off",
-            delta=(
-                fmt_float(trend.get("tt_air_min_change"), 2, " °C / ~1 jam")
-                if trend.get("tt_air_min_change") is not None
-                else None
-            ),
-            border=True,
-        )
-
-    rh_effective = params.get("rh_avg")
-    rh_source = source_values.get("rh_avg_source")
-    rh_invalid = safe_bool(adapter.get("rh_adapter_invalid"))
-
-    with m3:
-        if rh_effective is not None:
-            rh_display = fmt_float(rh_effective, 1, " %")
-        elif rh_invalid and rh_source is not None:
-            rh_display = "Tidak tersedia"
+            subset = mh.loc[(mh["_time"].dt.date >= dates[0]) & (mh["_time"].dt.date <= dates[1])]
+            columns = [c for c in MON_LABELS if c in mh]
+            selected = st.multiselect("Kolom yang ditampilkan", columns,
+                                     default=[c for c in ["tt_air_avg", "tt_air_min", "rh_avg", "ws_avg"] if c in columns],
+                                     format_func=lambda col: MON_LABELS[col], key="explore_columns")
+            st.caption(f"{len(subset)} observasi · kosong berarti data tidak tersedia, bukan nol.")
+            if subset.empty:
+                st.info("Tidak ada observasi tersimpan pada rentang tanggal ini.")
+            else:
+                table = subset[["observation_time_wib"] + selected].rename(
+                    columns={"observation_time_wib": "Waktu (WIB)", **MON_LABELS})
+                st.dataframe(table, width="stretch", hide_index=True, height=330)
+                download_csv(subset[["observation_time_wib"] + selected], "diengin_observasi.csv", "monitoring_csv")
+    with st.expander("Arsip ringkasan malam"):
+        if nights.empty:
+            st.info("Arsip ringkasan malam belum tersedia.")
         else:
-            rh_display = "—"
+            table = nights.copy()
+            if "tanggal_target" in table:
+                table = table.sort_values("tanggal_target", ascending=False)
+            for col in ["probabilitas_maksimum", "ambang_final"]:
+                if col in table:
+                    table[col] = (pd.to_numeric(table[col], errors="coerce") * 100).round(2)
+            table = table.rename(columns={
+                "tanggal_target": "Tanggal target", "jumlah_rilis_tersedia": "Rilis valid",
+                "ambang_final": "Ambang (%)", "probabilitas_maksimum": "Maksimum (%)",
+                "jam_probabilitas_maksimum_wib": "Jam maksimum (WIB)",
+                "jam_pertama_melampaui_ambang_wib": "Jam pertama melampaui ambang",
+                "prediksi_malam": "Indikasi (1=ya, 0=belum)",
+            })
+            st.dataframe(table, hide_index=True, width="stretch")
+            st.caption("Ringkasan mengikuti arsip pipeline dan jumlah rilisnya; sebagian malam dapat memiliki rilis tidak lengkap.")
+            download_csv(nights, "diengin_ringkasan_malam.csv", "night_csv")
 
-        st.metric(
-            "Kelembapan relatif",
-            rh_display,
-            delta_color="off",
-            delta=(
-                fmt_float(trend.get("rh_avg_change"), 1, " % / ~1 jam")
-                if trend.get("rh_avg_change") is not None
-                else None
-            ),
-            border=True,
+
+def render_info(monitor, pred, pipeline, states, now):
+    left, right = st.columns(2)
+    with left:
+        st.subheader("Kenali angkanya")
+        st.markdown(
+            "**Probabilitas** menunjukkan keluaran model, bukan kepastian kejadian. "
+            "Angka utama adalah probabilitas maksimum dari rilis yang tersedia untuk tanggal target.\n\n"
+            "**Ambang klasifikasi** adalah batas yang digunakan model untuk menghasilkan indikasi frost. "
+            "Warna penanda mengikuti ambang dari pipeline, tanpa kategori risiko tambahan.\n\n"
+            "**Rilis 21–07 WIB** melintasi tengah malam. Tanggal target merujuk pada pagi akhir periode. "
+            "Rilis yang hilang tetap ditandai kosong.\n\n"
+            "**Suhu minimum observasi** berbeda dengan minimum harian. **Titik embun** adalah suhu "
+            "ketika udara mencapai kondisi jenuh."
         )
-
-        if rh_invalid and rh_source is not None:
-            st.caption(
-                f"Nilai sumber: {fmt_float(rh_source, 1, ' %')} · "
-                "tidak lolos pemeriksaan kualitas data."
-            )
-
-    with m4:
-        st.metric(
-            "Kecepatan angin",
-            fmt_float(params.get("ws_avg"), 2),
-            delta_color="off",
-            delta=(
-                fmt_float(trend.get("ws_avg_change"), 2, " / ~1 jam")
-                if trend.get("ws_avg_change") is not None
-                else None
-            ),
-            border=True,
+    with right:
+        st.subheader("Kualitas & pembaruan")
+        st.markdown(
+            "Tampilan diperiksa ulang setiap **60 detik** selama halaman terbuka; pengambilan data "
+            "mengikuti pipeline terjadwal sekitar **15 menit**, dan dapat terlambat.\n\n"
+            "Umur data dihitung dari waktu observasi terhadap waktu sekarang: **≤30 menit** terkini, "
+            "**30–60 menit** terlambat, dan **>60 menit** data lama.\n\n"
+            "Garis grafik diputus saat ada nilai hilang atau jeda monitoring lebih dari 30 menit. "
+            "Nilai RH yang tidak lolos pemeriksaan kualitas tidak diganti dengan nol.\n\n"
+            "Kecepatan angin ditampilkan dalam unit sumber AWS; pembacaan hujan tidak dijumlahkan "
+            "menjadi akumulasi tanpa memastikan jenis pencatatannya."
         )
+    station = monitor.get("station") or {}
+    st.caption(f"Stasiun: {station.get('station_name') or '—'} · ID {station.get('station_id') or '—'} · "
+               f"Elevasi {fmt(station.get('elevation_m'), 0)} m · "
+               f"Koordinat {fmt(station.get('latitude'), 5)}, {fmt(station.get('longitude'), 5)}")
+    with st.expander("Detail operasional"):
+        st.write({
+            "Dashboard diperiksa (WIB)": time_label(now),
+            "Monitoring diproses": time_label(monitor.get("generated_at_wib")),
+            "Prediksi diproses": time_label(pred.get("generated_at_wib")),
+            "Status pipeline": pipeline.get("status", "belum tersedia"),
+            "Status monitoring": monitor.get("monitoring_status", "belum tersedia"),
+            "Berkas": states,
+        })
+        if pred.get("qc"):
+            st.dataframe(pd.DataFrame(pred["qc"]), width="stretch", hide_index=True)
 
-    e1, e2, e3, e4 = st.columns(4)
 
-    with e1:
-        st.metric(
-            "Titik embun",
-            fmt_float(params.get("dew_point_c"), 2, " °C"),
-            border=True,
-        )
+@st.fragment(run_every="60s")
+def dashboard():
+    now = pd.Timestamp.now(tz=WIB)
+    monitor, ms = read_file("output/monitoring_latest.json")
+    pred, ps = read_file("output/prediction_latest.json")
+    pipeline, ss = read_file("output/pipeline_status.json")
+    monitoring_history, hs = read_file("data/history/monitoring_history.csv", "csv")
+    release_history, rs = read_file("data/history/prediction_release_history.csv", "csv")
+    nights, ns = read_file("data/history/prediction_night_history.csv", "csv")
+    mh = timed_frame(monitoring_history, "observation_time_wib")
+    rh = timed_frame(release_history, "waktu_rilis_wib")
+    latest = monitor.get("latest_observation") or {}
+    station = monitor.get("station") or {}
+    fresh, fresh_text, age = freshness(latest.get("time_wib"), now)
 
-    with e2:
-        st.metric(
-            "Curah hujan AWS",
-            fmt_float(params.get("rr"), 2, " mm"),
-            border=True,
-        )
-
-    with e3:
-        st.metric(
-            "Tekanan",
-            fmt_float(params.get("pp_air"), 2, " hPa"),
-            border=True,
-        )
-
-    with e4:
-        wd = params.get("wd_avg")
-        st.metric(
-            "Arah angin",
-            fmt_float(wd, 1, "°"),
-            border=True,
-        )
-
-    # --------------------------------------------------------
-    # D. GRAFIK HISTORY MONITORING
-    # --------------------------------------------------------
-    st.subheader("Riwayat Monitoring")
-
-    if monitoring_history.empty:
-        st.info(
-            "History monitoring belum cukup untuk ditampilkan."
-        )
-    else:
-        mh = monitoring_history.copy()
-        mh["observation_time_wib"] = pd.to_datetime(
-            mh["observation_time_wib"],
-            errors="coerce",
-        )
-        mh = mh.dropna(subset=["observation_time_wib"]).sort_values(
-            "observation_time_wib"
-        )
-
-        # Use elapsed time because stored observations may have gaps.
-        if not mh.empty:
-            cutoff = mh["observation_time_wib"].max() - pd.Timedelta(hours=history_hours)
-            mh = mh.loc[mh["observation_time_wib"] >= cutoff]
-        st.caption(
-            f"{history_hours} jam terakhir dari observasi tersimpan · "
-            "waktu pada grafik dalam WIB."
-        )
-
-        tab_temp, tab_rh, tab_wind = st.tabs(
-            ["Suhu", "Kelembapan", "Angin"]
-        )
-
-        with tab_temp:
-            temp_cols = [
-                col for col in ["tt_air_avg", "tt_air_min", "tmin_min_1h"]
-                if col in mh.columns
-            ]
-            if temp_cols:
-                temp_cols_labels = {
-                    "tt_air_avg": "Suhu udara",
-                    "tt_air_min": "Suhu minimum observasi",
-                    "tmin_min_1h": "Suhu minimum 1 jam",
-                }
-                st.line_chart(
-                    mh.rename(columns=temp_cols_labels),
-                    x="observation_time_wib",
-                    y=[temp_cols_labels[col] for col in temp_cols],
-                    x_label="Waktu (WIB)",
-                    y_label="Suhu (°C)",
-                    height=330,
-                )
-            else:
-                st.info("Data suhu belum tersedia pada history.")
-
-        with tab_rh:
-            if "rh_avg" in mh.columns:
-                st.line_chart(
-                    mh.rename(columns={"rh_avg": "Kelembapan relatif"}),
-                    x="observation_time_wib",
-                    y="Kelembapan relatif",
-                    x_label="Waktu (WIB)",
-                    y_label="RH (%)",
-                    height=330,
-                )
-            else:
-                st.info("Data RH belum tersedia pada history.")
-
-        with tab_wind:
-            wind_cols = [
-                col for col in ["ws_avg", "ws_mean_1h", "ws_max_1h"]
-                if col in mh.columns
-            ]
-            if wind_cols:
-                wind_cols_labels = {
-                    "ws_avg": "Angin observasi",
-                    "ws_mean_1h": "Angin rata-rata 1 jam",
-                    "ws_max_1h": "Angin maksimum 1 jam",
-                }
-                st.line_chart(
-                    mh.rename(columns=wind_cols_labels),
-                    x="observation_time_wib",
-                    y=[wind_cols_labels[col] for col in wind_cols],
-                    x_label="Waktu (WIB)",
-                    y_label="Kecepatan angin",
-                    height=330,
-                )
-            else:
-                st.info("Data angin belum tersedia pada history.")
-
-    # --------------------------------------------------------
-    # E. RIWAYAT PROBABILITAS RILIS
-    # --------------------------------------------------------
-    st.subheader("Riwayat Probabilitas Rilis")
-
-    if release_history.empty:
-        st.info(
-            "History rilis prediksi belum tersedia."
-        )
-    else:
-        rh = release_history.copy()
-
-        if "waktu_rilis_wib" in rh.columns:
-            rh["waktu_rilis_wib"] = pd.to_datetime(
-                rh["waktu_rilis_wib"],
-                errors="coerce",
-            )
-
-        if "stack_prob" in rh.columns:
-            rh["stack_prob_pct"] = (
-                pd.to_numeric(
-                    rh["stack_prob"],
-                    errors="coerce",
-                )
-                * 100.0
-            )
-
-            threshold_value = None
-            if prediction and prediction.get("threshold_stacked") is not None:
-                threshold_value = float(
-                    prediction["threshold_stacked"]
-                ) * 100.0
-
-            if threshold_value is not None:
-                rh["ambang_pct"] = threshold_value
-
-            rh_plot = (
-                rh.dropna(
-                    subset=["waktu_rilis_wib"]
-                    if "waktu_rilis_wib" in rh.columns
-                    else []
-                )
-                .sort_values(
-                    "waktu_rilis_wib"
-                    if "waktu_rilis_wib" in rh.columns
-                    else rh.columns[0]
-                )
-                .tail(55)
-            )
-
-            y_cols = ["stack_prob_pct"]
-            if "ambang_pct" in rh_plot.columns:
-                y_cols.append("ambang_pct")
-
-            if "waktu_rilis_wib" in rh_plot.columns:
-                y_cols_labels = {
-                    "stack_prob_pct": "Probabilitas embun beku",
-                    "ambang_pct": "Ambang klasifikasi",
-                }
-                st.line_chart(
-                    rh_plot.rename(columns=y_cols_labels),
-                    x="waktu_rilis_wib",
-                    y=[y_cols_labels[col] for col in y_cols],
-                    x_label="Waktu rilis (WIB)",
-                    y_label="Probabilitas (%)",
-                    height=330,
-                )
-
-        show_cols = [
-            col for col in [
-                "tanggal_target",
-                "jam_rilis_wib",
-                "waktu_rilis_wib",
-                "stack_prob",
-                "ann_prob",
-                "svm_prob",
-                "rf_prob",
-                "status_data_rilis",
-            ]
-            if col in rh.columns
-        ]
-
-        if show_cols:
-            table = rh[show_cols].tail(22).copy()
-
-            for col in ["stack_prob", "ann_prob", "svm_prob", "rf_prob"]:
-                if col in table.columns:
-                    table[col] = (
-                        pd.to_numeric(table[col], errors="coerce") * 100
-                    ).round(3)
-
-            with st.expander("Lihat rincian probabilitas tiap model"):
-                st.dataframe(
-                    table.rename(columns={
-                        "tanggal_target": "Tanggal target",
-                        "jam_rilis_wib": "Jam rilis (WIB)",
-                        "waktu_rilis_wib": "Waktu rilis (WIB)",
-                        "stack_prob": "Stacked (%)",
-                        "ann_prob": "ANN (%)",
-                        "svm_prob": "SVM (%)",
-                        "rf_prob": "RF (%)",
-                        "status_data_rilis": "Status data",
-                    }),
-                    width="stretch",
-                    hide_index=True,
-                )
-
-    # --------------------------------------------------------
-    # F. NIGHT HISTORY
-    # --------------------------------------------------------
-    with st.expander("Riwayat ringkasan malam"):
-        if night_history.empty:
-            st.info("Ringkasan history malam belum tersedia.")
-        else:
-            nh = night_history.tail(30).copy()
-            st.dataframe(
-                nh,
-                width="stretch",
-                hide_index=True,
-            )
-
-    # --------------------------------------------------------
-    # G. FOOTER
-    # --------------------------------------------------------
-    st.divider()
-
-    generated_monitoring = (
-        monitoring.get("generated_at_wib")
-        if monitoring
-        else None
+    brand, refresh = st.columns([5, 1])
+    with brand:
+        st.markdown('<div class="dg-brand"><div class="dg-mark">❄</div><div><h1>DIENGIN</h1>'
+                    '<p>Cuaca Dieng. Prediksi embun beku.</p></div></div>', unsafe_allow_html=True)
+    with refresh:
+        if st.button("↻ Segarkan", width="stretch", help="Membaca hasil terbaru yang sudah tersedia.", key="refresh"):
+            st.rerun()
+    pill = "dg-fresh" if fresh == "current" else "dg-old"
+    st.markdown(
+        f'<div class="dg-strip"><span class="dg-pill {pill}"><i class="dg-dot"></i>{esc(fresh_text)}</span>'
+        f'<span>{esc(station.get("station_name") or "Stasiun AWS")}</span>'
+        f'<span class="dg-muted">{esc(time_label(latest.get("time_wib")))} · {esc(age_label(age))}</span></div>',
+        unsafe_allow_html=True,
     )
-    generated_prediction = (
-        prediction.get("generated_at_wib")
-        if prediction
-        else None
-    )
+    notices = []
+    if ms != "ok" or monitor.get("status") != "success":
+        notices.append("Monitoring belum tersedia; prediksi dan arsip yang tersedia tetap dapat dibuka.")
+    elif fresh in {"stale", "future", "delayed"}:
+        notices.append("Perhatikan waktu observasi: data ini belum menggambarkan kondisi terbaru.")
+    if monitor.get("monitoring_status") in {"partial", "invalid"}:
+        notices.append("Sebagian parameter tidak tersedia atau tidak lolos pemeriksaan kualitas.")
+    if pipeline and pipeline.get("status") not in {"success", None}:
+        notices.append("Pembaruan sistem terakhir belum berhasil.")
+    if notices:
+        st.markdown('<div class="dg-info warn">' + esc(" ".join(notices)) + "</div>", unsafe_allow_html=True)
 
-    st.caption(
-        f"Monitoring diperbarui sistem: {fmt_wib(generated_monitoring)} · "
-        f"Prediksi diperbarui sistem: {fmt_wib(generated_prediction)}"
-    )
-    st.caption(
-        "DIENGIN merupakan prototipe penelitian monitoring dan prediksi "
-        "embun beku berbasis AWS dan model skripsi; bukan produk peringatan resmi BMKG."
-    )
+    overview, explore, info = st.tabs(["Ringkasan", "Eksplorasi data", "Panduan & status"])
+    with overview:
+        forecast_col, weather_col = st.columns([1, 2])
+        with forecast_col:
+            render_forecast(pred, now)
+        with weather_col:
+            render_weather(monitor)
+            change = number((monitor.get("trend_1h") or {}).get("tt_air_avg_change"))
+            if change is not None and monitor.get("status") == "success":
+                st.markdown('<div class="dg-info">' + esc(
+                    f"Suhu {'turun' if change < 0 else 'naik' if change > 0 else 'tetap'} {fmt(abs(change))} °C "
+                    "dibanding referensi sekitar 1 jam sebelumnya. Tren ini bukan konfirmasi frost."
+                ) + "</div>", unsafe_allow_html=True)
+        weather_plot, release_plot = st.columns([1.2, 1])
+        with weather_plot:
+            render_trend(mh)
+        with release_plot:
+            render_prediction_history(rh, nights, pred, now)
+        st.download_button(
+            "↓ Simpan ringkasan", data=(
+                f"DIENGIN\nObservasi: {time_label(latest.get('time_wib'))}\n"
+                f"Status data: {fresh_text}\nTarget prediksi: {date_label(pred.get('target_night_date'))}\n"
+                f"Hasil: {prediction_state(pred, now)['label']}\n"
+                f"Probabilitas maksimum dari rilis tersedia: {pct(pred.get('probability_max_so_far'))}\n"
+                f"Rilis terakhir: {time_label((pred.get('latest_release') or {}).get('release_time_wib'))}\n"
+                "Prototipe penelitian; bukan peringatan resmi BMKG.\n"
+            ).encode("utf-8"), file_name="diengin_ringkasan.txt", mime="text/plain", key="summary_download",
+        )
+    with explore:
+        render_explore(mh, nights)
+    with info:
+        render_info(monitor, pred, pipeline, {"monitoring": ms, "prediksi": ps, "pipeline": ss,
+                    "riwayat_monitoring": hs, "riwayat_rilis": rs, "riwayat_malam": ns}, now)
+    st.markdown('<div class="dg-footer">DIENGIN · Prototipe penelitian, bukan peringatan resmi BMKG. '
+                'Seluruh waktu dalam WIB. Data kosong tidak berarti nol.</div>', unsafe_allow_html=True)
 
 
-live_dashboard()
+def main():
+    st.set_page_config(page_title="DIENGIN · Cuaca & Frost", page_icon="❄️", layout="wide",
+                       initial_sidebar_state="collapsed")
+    st.markdown(CSS, unsafe_allow_html=True)
+    dashboard()
+
+
+if __name__ == "__main__":
+    main()
