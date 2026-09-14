@@ -20,7 +20,7 @@ ALIGNMENT_CSS = """
    ========================================================= */
 @media(min-width: 1001px) {
     .dg-forecast {
-        min-height: 340px !important;
+        min-height: 356px !important;
     }
 }
 
