@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """DIENGIN dashboard entrypoint with BMKG public forecast integration."""
+# Operational redeploy trigger: 2026-09-15
 from __future__ import annotations
 
 import json
