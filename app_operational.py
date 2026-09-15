@@ -4,6 +4,9 @@
 Uses the dashboard/UI code from app.py, but reads operational JSON/CSV
 straight from the runtime branch so AWS/prediction history can refresh
 without waiting for a Streamlit redeploy.
+
+Also adds the rule-based EWS narrative layer:
+model probability trajectory + AWS context + BMKG forecast context.
 """
 from __future__ import annotations
 
@@ -16,9 +19,11 @@ import pandas as pd
 import streamlit as st
 
 import app
+from ews_narrative import build_ews_narrative, render_ews_narrative
 
 RUNTIME_RAW_BASE = "https://raw.githubusercontent.com/awann-sys/DIENGIN/runtime/"
 _original_read_file = app.base.read_file
+_original_render_weather = app.base.render_weather
 
 
 @st.cache_data(ttl=45, show_spinner=False)
@@ -61,9 +66,43 @@ def read_operational_file(relative: str, kind: str = "json"):
         return _original_read_file(relative, kind)
 
 
-# app.dashboard resolves base.read_file at runtime, so this keeps the
-# approved UI while making the data source operational/live.
+def render_weather_with_ews(monitor):
+    """Render weather cards, then the automatic EWS explanation."""
+    _original_render_weather(monitor)
+
+    try:
+        pred, _ = read_operational_file("output/prediction_latest.json")
+        release_history, _ = read_operational_file(
+            "data/history/prediction_release_history.csv",
+            "csv",
+        )
+        release_history = app.base.timed_frame(
+            release_history,
+            "waktu_rilis_wib",
+        )
+
+        try:
+            bmkg_payload, _ = app.get_bmkg_forecast()
+        except Exception:
+            bmkg_payload = {}
+
+        result = build_ews_narrative(
+            monitor=monitor,
+            pred=pred,
+            release_history=release_history,
+            bmkg_payload=bmkg_payload,
+            now=pd.Timestamp.now(tz=app.base.WIB),
+        )
+        render_ews_narrative(result)
+    except Exception as exc:
+        # Narrative is explanatory only; it must never break the core dashboard.
+        st.caption(f"Analisis otomatis EWS sementara belum tersedia ({type(exc).__name__}).")
+
+
+# app.dashboard resolves these base functions at runtime. This keeps the
+# approved UI, uses live runtime data, and adds the EWS explanation layer.
 app.base.read_file = read_operational_file
+app.base.render_weather = render_weather_with_ews
 
 
 if __name__ == "__main__":
