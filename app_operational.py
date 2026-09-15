@@ -23,8 +23,16 @@ import centered_dashboard
 from ews_narrative import build_ews_narrative, render_ews_narrative
 
 RUNTIME_RAW_BASE = "https://raw.githubusercontent.com/awann-sys/DIENGIN/runtime/"
-_original_read_file = app.base.read_file
-_original_render_weather = app.base.render_weather
+
+# Streamlit re-executes this entrypoint on every rerun. Keep stable references
+# to the genuine base functions so wrappers do not wrap themselves repeatedly.
+if not hasattr(app.base, "_diengin_original_read_file"):
+    app.base._diengin_original_read_file = app.base.read_file
+if not hasattr(app.base, "_diengin_original_render_weather"):
+    app.base._diengin_original_render_weather = app.base.render_weather
+
+_original_read_file = app.base._diengin_original_read_file
+_original_render_weather = app.base._diengin_original_render_weather
 
 
 @st.cache_data(ttl=45, show_spinner=False)
@@ -68,7 +76,7 @@ def read_operational_file(relative: str, kind: str = "json"):
 
 
 def render_weather_with_ews(monitor):
-    """Render centered weather cards, then the automatic EWS explanation."""
+    """Render centered weather cards, then exactly one EWS explanation."""
     _original_render_weather(monitor)
 
     try:
