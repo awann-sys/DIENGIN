@@ -230,6 +230,16 @@ FRAMER_CSS = r"""
   font-size:.98rem!important;line-height:1.55!important;
 }
 .dg-footer{font-size:.9rem!important;line-height:1.5!important;text-align:center!important;}
+.dg-ews-auto{
+  border-radius:18px!important;
+  padding:1.15rem 1.25rem!important;
+  margin:1rem 0 .35rem!important;
+}
+.dg-ews-auto .eyebrow{font-size:.9rem!important;letter-spacing:.065em!important;}
+.dg-ews-auto h3{font-size:1.28rem!important;line-height:1.35!important;margin:.42rem 0 .58rem!important;}
+.dg-ews-auto p{font-size:1rem!important;line-height:1.65!important;}
+.dg-ews-chip{font-size:.9rem!important;padding:.38rem .68rem!important;}
+.dg-ews-note{font-size:.88rem!important;line-height:1.55!important;margin-top:.72rem!important;}
 [data-testid="stButton"] button,[data-testid="stDownloadButton"] button{
   min-height:44px!important;font-size:.95rem!important;font-weight:700!important;border-radius:12px!important;
 }
