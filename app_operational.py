@@ -5,8 +5,8 @@ Uses the dashboard/UI code from app.py, but reads operational JSON/CSV
 straight from the runtime branch so AWS/prediction history can refresh
 without waiting for a Streamlit redeploy.
 
-Also adds the rule-based EWS narrative layer:
-model probability trajectory + AWS context + BMKG forecast context.
+Also adds the rule-based EWS narrative layer and the centered dashboard
+composition.
 """
 from __future__ import annotations
 
@@ -19,6 +19,7 @@ import pandas as pd
 import streamlit as st
 
 import app
+import centered_dashboard
 from ews_narrative import build_ews_narrative, render_ews_narrative
 
 RUNTIME_RAW_BASE = "https://raw.githubusercontent.com/awann-sys/DIENGIN/runtime/"
@@ -67,7 +68,7 @@ def read_operational_file(relative: str, kind: str = "json"):
 
 
 def render_weather_with_ews(monitor):
-    """Render weather cards, then the automatic EWS explanation."""
+    """Render centered weather cards, then the automatic EWS explanation."""
     _original_render_weather(monitor)
 
     try:
@@ -99,10 +100,11 @@ def render_weather_with_ews(monitor):
         st.caption(f"Analisis otomatis EWS sementara belum tersedia ({type(exc).__name__}).")
 
 
-# app.dashboard resolves these base functions at runtime. This keeps the
-# approved UI, uses live runtime data, and adds the EWS explanation layer.
+# app_base resolves these globals at runtime. Core data/model behavior stays
+# unchanged while the presentation becomes live, centered, and narrative-aware.
 app.base.read_file = read_operational_file
 app.base.render_weather = render_weather_with_ews
+app.base.dashboard = centered_dashboard.dashboard
 
 
 if __name__ == "__main__":
