@@ -1,0 +1,1 @@
+centered dashboard module added; operational entrypoint wiring pending
