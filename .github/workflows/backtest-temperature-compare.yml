@@ -14,7 +14,7 @@ permissions:
 jobs:
   temperature-compare:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 45
     env:
       TZ: Asia/Jakarta
       AWS_API_USERNAME: ${{ secrets.AWS_API_USERNAME }}
@@ -53,8 +53,23 @@ jobs:
             echo "======================================"
             echo "Temperature compatibility target: $d"
             echo "======================================"
-            BACKTEST_TARGET_DATE="$d" BACKTEST_OBSERVED_FROST=1 \
-              python src/backtest_temperature_compare.py
+            ok=0
+            for attempt in 1 2 3; do
+              echo "Attempt $attempt for $d"
+              if BACKTEST_TARGET_DATE="$d" BACKTEST_OBSERVED_FROST=1 \
+                python src/backtest_temperature_compare.py; then
+                ok=1
+                break
+              fi
+              if [ "$attempt" -lt 3 ]; then
+                echo "Transient failure; waiting 20 seconds before retry..."
+                sleep 20
+              fi
+            done
+            if [ "$ok" -ne 1 ]; then
+              echo "Backtest failed after 3 attempts for $d"
+              exit 1
+            fi
           done
 
       - name: Build combined comparison summary
