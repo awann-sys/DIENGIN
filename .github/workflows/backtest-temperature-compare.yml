@@ -1,0 +1,86 @@
+name: DIENGIN Temperature Compatibility Backtest
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/backtest_temperature_compare.py"
+      - ".github/workflows/backtest-temperature-compare.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  temperature-compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      TZ: Asia/Jakarta
+      AWS_API_USERNAME: ${{ secrets.AWS_API_USERNAME }}
+      AWS_API_PASSWORD: ${{ secrets.AWS_API_PASSWORD }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: requirements_cloud.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements_cloud.txt
+
+      - name: Compare current vs corrected temperature features
+        shell: bash
+        run: |
+          set -e
+          DATES=(
+            2026-08-23
+            2026-08-26
+            2026-08-27
+            2026-08-31
+            2026-09-01
+            2026-09-06
+            2026-09-15
+          )
+          for d in "${DATES[@]}"; do
+            echo "======================================"
+            echo "Temperature compatibility target: $d"
+            echo "======================================"
+            BACKTEST_TARGET_DATE="$d" BACKTEST_OBSERVED_FROST=1 \
+              python src/backtest_temperature_compare.py
+          done
+
+      - name: Build combined comparison summary
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          import pandas as pd
+
+          rows = []
+          for path in sorted(Path("output").glob("temperature_compare_*/comparison_delta.json")):
+              rows.append(json.loads(path.read_text(encoding="utf-8")))
+
+          df = pd.DataFrame(rows)
+          out = Path("output/temperature_compatibility_summary.csv")
+          df.to_csv(out, index=False)
+          print(df.to_string(index=False))
+          PY
+
+      - name: Upload temperature compatibility results
+        uses: actions/upload-artifact@v4
+        with:
+          name: diengin-temperature-compatibility-2026
+          path: |
+            output/temperature_compare_*/
+            output/temperature_compatibility_summary.csv
+            data/backtest/*.csv
+          retention-days: 14
