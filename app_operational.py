@@ -16,6 +16,7 @@ import pandas as pd
 import streamlit as st
 
 import app
+import clean_prediction
 import clean_trend
 import figma_dashboard
 
@@ -72,6 +73,7 @@ def read_operational_file(relative: str, kind: str = "json"):
 # app_base resolves these globals at runtime.
 app.base.read_file = read_operational_file
 app.base.render_trend = clean_trend.render_trend
+app.base.render_prediction_history = clean_prediction.render_prediction_history
 app.base.dashboard = figma_dashboard.dashboard
 
 
