@@ -16,6 +16,7 @@ import pandas as pd
 import streamlit as st
 
 import app
+import clean_trend
 import figma_dashboard
 
 RUNTIME_RAW_BASE = "https://raw.githubusercontent.com/awann-sys/DIENGIN/runtime/"
@@ -70,6 +71,7 @@ def read_operational_file(relative: str, kind: str = "json"):
 
 # app_base resolves these globals at runtime.
 app.base.read_file = read_operational_file
+app.base.render_trend = clean_trend.render_trend
 app.base.dashboard = figma_dashboard.dashboard
 
 
