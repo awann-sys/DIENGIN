@@ -18,7 +18,7 @@ import streamlit as st
 import app
 import clean_prediction
 import clean_trend
-import figma_dashboard
+import nav_dashboard
 
 RUNTIME_RAW_BASE = "https://raw.githubusercontent.com/awann-sys/DIENGIN/runtime/"
 
@@ -74,7 +74,7 @@ def read_operational_file(relative: str, kind: str = "json"):
 app.base.read_file = read_operational_file
 app.base.render_trend = clean_trend.render_trend
 app.base.render_prediction_history = clean_prediction.render_prediction_history
-app.base.dashboard = figma_dashboard.dashboard
+app.base.dashboard = nav_dashboard.dashboard
 
 
 if __name__ == "__main__":
