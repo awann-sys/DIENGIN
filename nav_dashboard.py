@@ -32,7 +32,7 @@ TOPNAV_CSS = r"""
 .st-key-dg_topbar > div{
   background:color-mix(in srgb,var(--dg-card) 94%,transparent)!important;
   border:1px solid var(--dg-border)!important;
-  border-radius:20px!important;
+  border-radius:18px!important;
   padding:.52rem .72rem!important;
   box-shadow:0 10px 30px var(--dg-shadow)!important;
   backdrop-filter:blur(16px)!important;
@@ -40,7 +40,7 @@ TOPNAV_CSS = r"""
 }
 .st-key-dg_topbar [data-testid="stHorizontalBlock"]{
   align-items:center!important;
-  gap:.55rem!important;
+  gap:.45rem!important;
 }
 .dg-top-brand{
   display:flex;align-items:center;gap:.62rem;min-height:40px;
@@ -52,10 +52,6 @@ TOPNAV_CSS = r"""
   background:linear-gradient(135deg,var(--dg-blue),var(--dg-cyan));color:#fff;
   font-size:17px;box-shadow:0 6px 14px var(--dg-glow);flex:0 0 36px;
 }
-.dg-top-brand-place{
-  margin-left:.15rem;padding-left:.72rem;border-left:1px solid var(--dg-border);
-  color:var(--dg-muted);font-size:.78rem;font-weight:650;letter-spacing:0;
-}
 .st-key-dg_nav_control{
   display:flex!important;justify-content:center!important;align-items:center!important;
   min-height:40px!important;
@@ -64,11 +60,11 @@ TOPNAV_CSS = r"""
   width:auto!important;justify-content:center!important;margin:0 auto!important;
 }
 .st-key-dg_nav_control [data-testid="stSegmentedControl"] > div{
-  width:auto!important;justify-content:center!important;gap:.12rem!important;
+  width:auto!important;justify-content:center!important;gap:.16rem!important;
   background:transparent!important;border:0!important;padding:0!important;
 }
 .st-key-dg_nav_control button{
-  min-width:112px!important;min-height:38px!important;padding:.42rem .72rem!important;
+  min-width:116px!important;min-height:38px!important;padding:.42rem .72rem!important;
   border-radius:10px!important;font-family:"Plus Jakarta Sans",sans-serif!important;
   font-size:.92rem!important;font-weight:720!important;
 }
@@ -76,16 +72,16 @@ TOPNAV_CSS = r"""
   display:flex!important;justify-content:flex-end!important;align-items:center!important;
   min-height:40px!important;
 }
+.st-key-dg_theme_col > div{width:auto!important;margin-left:auto!important}
 .dg-hero-copy-note{margin-top:.75rem;font-size:.78rem;opacity:.78}
 
 @media(max-width:980px){
-  .dg-top-brand-place{display:none}
-  .st-key-dg_nav_control button{min-width:94px!important}
+  .st-key-dg_nav_control button{min-width:96px!important}
 }
 @media(max-width:760px){
   .st-key-dg_topbar{top:.25rem!important}
   .st-key-dg_topbar > div{padding:.46rem .5rem!important;border-radius:16px!important}
-  .dg-top-brand span:nth-child(2){display:none}
+  .dg-top-brand span:last-child{display:none}
   .dg-top-brand-badge{width:34px;height:34px;flex-basis:34px}
   .st-key-dg_nav_control button{min-width:auto!important;font-size:.79rem!important;padding:.36rem .42rem!important}
 }
@@ -103,15 +99,14 @@ def _num(value):
 
 
 def _top_nav() -> str:
-    # Equal side columns keep the navigation optically centered at all widths.
+    # Equal side columns keep the center navigation genuinely centered.
     with st.container(key="dg_topbar"):
-        brand_col, nav_col, theme_col = st.columns([1.0, 1.65, 1.0], vertical_alignment="center")
+        brand_col, nav_col, theme_col = st.columns([1.0, 1.75, 1.0], vertical_alignment="center")
         with brand_col:
             st.markdown(
                 '<div class="dg-top-brand">'
                 '<span class="dg-top-brand-badge">❄</span>'
                 '<span>DIENGIN</span>'
-                '<span class="dg-top-brand-place">Dieng</span>'
                 '</div>',
                 unsafe_allow_html=True,
             )
