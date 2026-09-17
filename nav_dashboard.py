@@ -16,6 +16,7 @@ import streamlit as st
 import app
 import centered_dashboard as ui
 import dashboard_features as features
+import theme_controller as theme
 from ews_narrative import build_ews_narrative
 
 base = app.base
@@ -23,18 +24,19 @@ base = app.base
 TOPNAV_CSS = r"""
 <style>
 .st-key-dg_topbar{margin:.15rem 0 1rem!important}
-.st-key-dg_topbar > div{background:#fff!important;border:1px solid var(--dg-border)!important;border-radius:20px!important;padding:.62rem .78rem!important;box-shadow:0 8px 26px rgba(25,47,78,.045)!important}
+.st-key-dg_topbar > div{background:var(--dg-card)!important;border:1px solid var(--dg-border)!important;border-radius:20px!important;padding:.62rem .78rem!important;box-shadow:0 8px 26px var(--dg-shadow)!important}
 .st-key-dg_topbar [data-testid="stHorizontalBlock"]{align-items:center!important;gap:.7rem!important}
 .dg-top-brand{display:flex;align-items:center;gap:.68rem;min-height:42px;color:var(--dg-ink);font-family:"Plus Jakarta Sans",sans-serif;font-size:1.05rem;font-weight:800;letter-spacing:.025em}
 .dg-top-brand-badge{width:36px;height:36px;display:grid;place-items:center;border-radius:11px;background:var(--dg-blue);color:#fff;font-size:18px}
+.dg-top-actions{display:flex;align-items:center;justify-content:flex-end;gap:.5rem;min-height:42px}
 .dg-top-place{min-height:42px;display:flex;align-items:center;justify-content:flex-end}
-.dg-top-place span{display:inline-flex;align-items:center;gap:.38rem;padding:.55rem .82rem;border-radius:999px;background:#edf5ff;color:var(--dg-blue);font-family:"Plus Jakarta Sans",sans-serif;font-size:.95rem;font-weight:700}
+.dg-top-place span{display:inline-flex;align-items:center;gap:.38rem;padding:.55rem .82rem;border-radius:999px;background:var(--dg-soft);color:var(--dg-blue);font-family:"Plus Jakarta Sans",sans-serif;font-size:.95rem;font-weight:700}
 .st-key-dg_nav_control{display:flex!important;justify-content:center!important;align-items:center!important;min-height:42px}
 .st-key-dg_nav_control [data-testid="stSegmentedControl"]{width:100%!important;justify-content:center!important}
 .st-key-dg_nav_control [data-testid="stSegmentedControl"] > div{justify-content:center!important;gap:.2rem!important;background:transparent!important;border:0!important}
 .st-key-dg_nav_control button{min-height:38px!important;padding:.45rem .72rem!important;border-radius:10px!important;font-family:"Plus Jakarta Sans",sans-serif!important;font-size:.96rem!important;font-weight:700!important}
 .dg-hero-copy-note{margin-top:.75rem;font-size:.78rem;opacity:.78}
-@media(max-width:800px){.dg-top-place{display:none}.st-key-dg_topbar [data-testid="column"]:last-child{display:none!important}}
+@media(max-width:800px){.dg-top-place{display:none}.st-key-dg_topbar [data-testid="stHorizontalBlock"]{gap:.45rem!important}}
 @media(max-width:620px){.st-key-dg_topbar > div{padding:.55rem!important}.dg-top-brand span:last-child{display:none}.st-key-dg_nav_control button{font-size:.86rem!important;padding:.4rem .45rem!important}}
 </style>
 """
@@ -51,9 +53,12 @@ def _num(value):
 
 def _top_nav() -> str:
     with st.container(key="dg_topbar"):
-        brand_col, nav_col, place_col = st.columns([1.0, 1.6, 1.0], vertical_alignment="center")
+        brand_col, nav_col, action_col = st.columns([1.0, 1.62, 1.08], vertical_alignment="center")
         with brand_col:
-            st.markdown('<div class="dg-top-brand"><span class="dg-top-brand-badge">❄</span><span>DIENGIN</span></div>', unsafe_allow_html=True)
+            st.markdown(
+                '<div class="dg-top-brand"><span class="dg-top-brand-badge">❄</span><span>DIENGIN</span></div>',
+                unsafe_allow_html=True,
+            )
         with nav_col:
             with st.container(key="dg_nav_control"):
                 page = st.segmented_control(
@@ -63,8 +68,15 @@ def _top_nav() -> str:
                     key="dg_primary_nav",
                     label_visibility="collapsed",
                 )
-        with place_col:
-            st.markdown('<div class="dg-top-place"><span>⌖ Dieng Plateau</span></div>', unsafe_allow_html=True)
+        with action_col:
+            place_col, theme_col = st.columns([3.2, 1], vertical_alignment="center")
+            with place_col:
+                st.markdown(
+                    '<div class="dg-top-place"><span>⌖ Dieng Plateau</span></div>',
+                    unsafe_allow_html=True,
+                )
+            with theme_col:
+                theme.render_toggle()
     return page or "Prediksi"
 
 
@@ -174,7 +186,7 @@ def _render_hero(monitor, pred, rh, now):
     elif abs(delta) < 0.005:
         delta_text = "→ relatif stabil"
     else:
-        delta_text = f"{'↑ +' if delta > 0 else '↓ '}{delta * 100:.0f} poin" if delta > 0 else f"↓ {abs(delta) * 100:.0f} poin"
+        delta_text = f"↑ +{delta * 100:.0f} poin" if delta > 0 else f"↓ {abs(delta) * 100:.0f} poin"
 
     st.markdown(
         '<div class="dg-hero"><div>'
@@ -207,6 +219,7 @@ def _render_notices(monitor, pipeline, ms, fresh):
 
 
 def dashboard() -> None:
+    theme.apply_theme()
     now = pd.Timestamp.now(tz=base.WIB)
     monitor, pred, pipeline, mh, rh, nights, statuses = _load_data()
     page = _top_nav()
