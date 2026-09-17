@@ -18,10 +18,15 @@ import streamlit as st
 # Keep the existing visual base/tokens available to the redesigned dashboard.
 import app_ui  # noqa: F401
 import app_base as base
+from light_controls import LIGHT_CONTROLS_CSS
 
 BMKG_ADM4 = "33.04.16.2008"
 BMKG_API_URL = f"https://api.bmkg.go.id/publik/prakiraan-cuaca?adm4={BMKG_ADM4}"
 RUNTIME_RAW_BASE = "https://raw.githubusercontent.com/awann-sys/DIENGIN/runtime/"
+
+# Force Streamlit's native widgets to use the same light visual system as the
+# custom DIENGIN cards, even when the browser / device prefers a dark scheme.
+base.CSS += LIGHT_CONTROLS_CSS
 
 BMKG_CSS = r"""
 <style>
