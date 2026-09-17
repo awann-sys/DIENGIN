@@ -39,7 +39,7 @@ def render_toggle() -> None:
     icon = "☀️" if active == "dark" else "🌙"
     help_text = "Gunakan mode terang" if active == "dark" else "Gunakan mode gelap"
     with st.container(key="dg_theme_toggle_wrap"):
-        if st.button(icon, key="dg_theme_toggle", help=help_text, use_container_width=True):
+        if st.button(icon, key="dg_theme_toggle", help=help_text, width="stretch"):
             toggle_theme()
 
 
@@ -115,8 +115,10 @@ html,body,.stApp,[data-testid="stAppViewContainer"],section[data-testid="stMain"
 }}
 .dg-scale-chip{{background:{tokens['chip']}!important;border-color:{tokens['border']}!important;}}
 .dg-current-head h2,.dg-weather-label,.dg-weather-value,.dg-hour-time,.dg-hour-label,.dg-top-brand{{color:{tokens['ink']}!important;}}
-.dg-current-head p,.dg-weather-note,.dg-secondary-line,.dg-scale-legend,.dg-explorer-help,.dg-hour-note{{color:{tokens['muted']}!important;}}
+.dg-current-head p,.dg-weather-note,.dg-secondary-line,.dg-scale-legend,.dg-explorer-help,.dg-hour-note,.dg-bmkg-meta,.dg-bmkg-time,.dg-bmkg-source{{color:{tokens['muted']}!important;}}
 .dg-top-place span{{background:{tokens['soft']}!important;color:{tokens['blue']}!important;}}
+.dg-svg-wrap line{{stroke:{tokens['grid']}!important;}}
+.dg-svg-wrap text{{fill:{tokens['muted']}!important;}}
 
 /* Streamlit native controls */
 [data-testid="stWidgetLabel"],
