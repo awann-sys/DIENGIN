@@ -30,34 +30,64 @@ TOPNAV_CSS = r"""
   z-index:999!important;
 }
 .st-key-dg_topbar > div{
-  background:color-mix(in srgb,var(--dg-card) 92%,transparent)!important;
+  background:color-mix(in srgb,var(--dg-card) 94%,transparent)!important;
   border:1px solid var(--dg-border)!important;
   border-radius:20px!important;
-  padding:.62rem .78rem!important;
+  padding:.52rem .72rem!important;
   box-shadow:0 10px 30px var(--dg-shadow)!important;
   backdrop-filter:blur(16px)!important;
   -webkit-backdrop-filter:blur(16px)!important;
 }
-.st-key-dg_topbar [data-testid="stHorizontalBlock"]{align-items:center!important;gap:.7rem!important}
-.dg-top-brand{display:flex;align-items:center;gap:.68rem;min-height:42px;color:var(--dg-ink);font-family:"Plus Jakarta Sans",sans-serif;font-size:1.05rem;font-weight:800;letter-spacing:.025em}
-.dg-top-brand-badge{width:36px;height:36px;display:grid;place-items:center;border-radius:11px;background:linear-gradient(135deg,var(--dg-blue),var(--dg-cyan));color:#fff;font-size:18px;box-shadow:0 7px 16px var(--dg-glow)}
-.dg-top-place{min-height:42px;display:flex;align-items:center;justify-content:flex-end}
-.dg-top-place span{display:inline-flex;align-items:center;gap:.38rem;padding:.55rem .75rem;border-radius:999px;background:var(--dg-soft);color:var(--dg-blue);font-family:"Plus Jakarta Sans",sans-serif;font-size:.9rem;font-weight:700;white-space:nowrap}
-.st-key-dg_nav_control{display:flex!important;justify-content:center!important;align-items:center!important;min-height:42px}
-.st-key-dg_nav_control [data-testid="stSegmentedControl"]{width:100%!important;justify-content:center!important}
-.st-key-dg_nav_control [data-testid="stSegmentedControl"] > div{justify-content:center!important;gap:.18rem!important;background:transparent!important;border:0!important}
-.st-key-dg_nav_control button{min-height:38px!important;padding:.45rem .72rem!important;border-radius:10px!important;font-family:"Plus Jakarta Sans",sans-serif!important;font-size:.94rem!important;font-weight:750!important}
-.dg-hero-copy-note{margin-top:.75rem;font-size:.78rem;opacity:.78}
-@media(max-width:980px){
-  .dg-top-place{display:none}
-  .st-key-dg_topbar [data-testid="stHorizontalBlock"]{gap:.45rem!important}
+.st-key-dg_topbar [data-testid="stHorizontalBlock"]{
+  align-items:center!important;
+  gap:.55rem!important;
 }
-@media(max-width:720px){
+.dg-top-brand{
+  display:flex;align-items:center;gap:.62rem;min-height:40px;
+  color:var(--dg-ink);font-family:"Plus Jakarta Sans",sans-serif;
+  font-size:1.02rem;font-weight:800;letter-spacing:.025em;white-space:nowrap;
+}
+.dg-top-brand-badge{
+  width:36px;height:36px;display:grid;place-items:center;border-radius:11px;
+  background:linear-gradient(135deg,var(--dg-blue),var(--dg-cyan));color:#fff;
+  font-size:17px;box-shadow:0 6px 14px var(--dg-glow);flex:0 0 36px;
+}
+.dg-top-brand-place{
+  margin-left:.15rem;padding-left:.72rem;border-left:1px solid var(--dg-border);
+  color:var(--dg-muted);font-size:.78rem;font-weight:650;letter-spacing:0;
+}
+.st-key-dg_nav_control{
+  display:flex!important;justify-content:center!important;align-items:center!important;
+  min-height:40px!important;
+}
+.st-key-dg_nav_control [data-testid="stSegmentedControl"]{
+  width:auto!important;justify-content:center!important;margin:0 auto!important;
+}
+.st-key-dg_nav_control [data-testid="stSegmentedControl"] > div{
+  width:auto!important;justify-content:center!important;gap:.12rem!important;
+  background:transparent!important;border:0!important;padding:0!important;
+}
+.st-key-dg_nav_control button{
+  min-width:112px!important;min-height:38px!important;padding:.42rem .72rem!important;
+  border-radius:10px!important;font-family:"Plus Jakarta Sans",sans-serif!important;
+  font-size:.92rem!important;font-weight:720!important;
+}
+.st-key-dg_theme_col{
+  display:flex!important;justify-content:flex-end!important;align-items:center!important;
+  min-height:40px!important;
+}
+.dg-hero-copy-note{margin-top:.75rem;font-size:.78rem;opacity:.78}
+
+@media(max-width:980px){
+  .dg-top-brand-place{display:none}
+  .st-key-dg_nav_control button{min-width:94px!important}
+}
+@media(max-width:760px){
   .st-key-dg_topbar{top:.25rem!important}
-  .st-key-dg_topbar > div{padding:.5rem!important;border-radius:16px!important}
-  .dg-top-brand span:last-child{display:none}
-  .dg-top-brand-badge{width:34px;height:34px}
-  .st-key-dg_nav_control button{font-size:.82rem!important;padding:.38rem .45rem!important}
+  .st-key-dg_topbar > div{padding:.46rem .5rem!important;border-radius:16px!important}
+  .dg-top-brand span:nth-child(2){display:none}
+  .dg-top-brand-badge{width:34px;height:34px;flex-basis:34px}
+  .st-key-dg_nav_control button{min-width:auto!important;font-size:.79rem!important;padding:.36rem .42rem!important}
 }
 </style>
 """
@@ -73,11 +103,16 @@ def _num(value):
 
 
 def _top_nav() -> str:
+    # Equal side columns keep the navigation optically centered at all widths.
     with st.container(key="dg_topbar"):
-        brand_col, nav_col, action_col = st.columns([.86, 1.5, 1.34], vertical_alignment="center")
+        brand_col, nav_col, theme_col = st.columns([1.0, 1.65, 1.0], vertical_alignment="center")
         with brand_col:
             st.markdown(
-                '<div class="dg-top-brand"><span class="dg-top-brand-badge">❄</span><span>DIENGIN</span></div>',
+                '<div class="dg-top-brand">'
+                '<span class="dg-top-brand-badge">❄</span>'
+                '<span>DIENGIN</span>'
+                '<span class="dg-top-brand-place">Dieng</span>'
+                '</div>',
                 unsafe_allow_html=True,
             )
         with nav_col:
@@ -89,14 +124,8 @@ def _top_nav() -> str:
                     key="dg_primary_nav",
                     label_visibility="collapsed",
                 )
-        with action_col:
-            place_col, theme_col = st.columns([1.15, 1.75], vertical_alignment="center")
-            with place_col:
-                st.markdown(
-                    '<div class="dg-top-place"><span>⌖ Dieng</span></div>',
-                    unsafe_allow_html=True,
-                )
-            with theme_col:
+        with theme_col:
+            with st.container(key="dg_theme_col"):
                 theme.render_toggle()
     return page or "Prediksi"
 
