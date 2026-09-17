@@ -18,20 +18,15 @@ import streamlit as st
 # Keep the existing visual base/tokens available to the redesigned dashboard.
 import app_ui  # noqa: F401
 import app_base as base
-from light_controls import LIGHT_CONTROLS_CSS
 
 BMKG_ADM4 = "33.04.16.2008"
 BMKG_API_URL = f"https://api.bmkg.go.id/publik/prakiraan-cuaca?adm4={BMKG_ADM4}"
 RUNTIME_RAW_BASE = "https://raw.githubusercontent.com/awann-sys/DIENGIN/runtime/"
 
-# Force Streamlit's native widgets to use the same light visual system as the
-# custom DIENGIN cards, even when the browser / device prefers a dark scheme.
-base.CSS += LIGHT_CONTROLS_CSS
-
 BMKG_CSS = r"""
 <style>
 .dg-bmkg-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.9rem;margin:.75rem 0 .95rem}
-.dg-bmkg-card{border:1px solid rgba(128,128,128,.22);border-radius:14px;padding:1rem 1.1rem;background:rgba(128,128,128,.045);min-height:160px}
+.dg-bmkg-card{border:1px solid var(--dg-border);border-radius:14px;padding:1rem 1.1rem;background:var(--dg-card);min-height:160px}
 .dg-bmkg-time{font-size:.86rem;font-weight:500;opacity:.7;margin-bottom:.48rem}
 .dg-bmkg-weather{font-size:1.2rem;font-weight:680;line-height:1.32;min-height:50px;display:flex;align-items:flex-start}
 .dg-bmkg-weather .emoji{font-size:1.55rem;line-height:1;margin-right:.42rem;flex-shrink:0}
