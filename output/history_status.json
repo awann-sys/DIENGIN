@@ -1,0 +1,28 @@
+{
+  "status": "success",
+  "generated_at_wib": "2026-10-11T02:22:38.675899+07:00",
+  "history_dir": "/home/runner/work/DIENGIN/DIENGIN/data/history",
+  "results": {
+    "monitoring": {
+      "status": "success",
+      "incoming_rows": 1,
+      "rows_before": 2825,
+      "stored_rows": 2826,
+      "changed": true
+    },
+    "prediction_release": {
+      "status": "success",
+      "incoming_rows": 11,
+      "rows_before": 409,
+      "stored_rows": 413,
+      "changed": true
+    },
+    "prediction_night": {
+      "status": "success",
+      "incoming_rows": 2,
+      "rows_before": 38,
+      "stored_rows": 38,
+      "changed": true
+    }
+  }
+}
