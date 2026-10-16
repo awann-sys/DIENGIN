@@ -51,6 +51,10 @@ PARAMETERS = [
     "tt_air_min",
     "rh_avg",
     "pp_air",
+    "tt_air_max",
+    "ws_max",
+    "sr_avg",
+    "sr_max",
 ]
 
 # Struktur proyek:

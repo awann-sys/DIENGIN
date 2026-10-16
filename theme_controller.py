@@ -78,15 +78,15 @@ def apply_theme() -> str:
         scheme = "dark"
     else:
         t = {
-            "surface": "#F4F7FB",
+            "surface": "#F3F7F5",
             "card": "#FFFFFF",
-            "soft": "#F2F7FD",
+            "soft": "#E8F5F1",
             "control": "#FFFFFF",
-            "ink": "#1E2B3F",
-            "muted": "#6F7D91",
+            "ink": "#172E37",
+            "muted": "#60757C",
             "border": "rgba(32,54,82,.12)",
-            "blue": "#2878F0",
-            "cyan": "#35AFE8",
+            "blue": "#087F75",
+            "cyan": "#38AA98",
             "shadow": "rgba(25,47,78,.08)",
             "grid": "#E5ECF5",
             "chip": "#F7FAFE",

@@ -17,6 +17,7 @@ import app
 import centered_dashboard as ui
 import dashboard_features as features
 import theme_controller as theme
+import expressive_dashboard as design
 from ews_narrative import build_ews_narrative
 
 base = app.base
@@ -246,7 +247,7 @@ def _render_hero(monitor, pred, rh, now):
         '</div></div>',
         unsafe_allow_html=True,
     )
-    return fresh
+    return fresh, result
 
 
 def _render_notices(monitor, pipeline, ms, fresh):
@@ -264,36 +265,49 @@ def _render_notices(monitor, pipeline, ms, fresh):
 
 
 def dashboard() -> None:
+    # Render on every run; module-import side effects alone are lost after
+    # Streamlit reloads modules or starts a fresh browser session.
+    st.markdown(ui.FRAMER_CSS + TOPNAV_CSS, unsafe_allow_html=True)
     theme.apply_theme()
+    st.markdown(design.CSS, unsafe_allow_html=True)
     now = pd.Timestamp.now(tz=base.WIB)
     monitor, pred, pipeline, mh, rh, nights, statuses = _load_data()
     page = _top_nav()
+    # Weather is forecast context; the illustration never asserts observed frost.
+    try:
+        payload, _ = app.get_bmkg_forecast()
+        points = _future_bmkg_points(payload, now)
+        weather = str(points[0][1].get("weather_desc") or "") if points else ""
+    except Exception:
+        weather = ""
+    release = pred.get("latest_release") or {}
+    current_probability = _num(release.get("stacked_probability"))
+    threshold = _num(pred.get("threshold_stacked"))
+    design.render_live_heading(weather, frost=(current_probability is not None and threshold is not None and current_probability >= threshold))
 
     if page == "Prediksi":
-        fresh = _render_hero(monitor, pred, rh, now)
+        fresh, result = _render_hero(monitor, pred, rh, now)
         features.render_prediction_weather(monitor, mh, now)
         _render_notices(monitor, pipeline, statuses["monitoring"], fresh)
 
-        ui._section(
-            "PERKEMBANGAN PREDIKSI",
-            "Perkembangan prediksi selama satu malam",
-            "Setiap kartu menunjukkan probabilitas pada satu rilis DIENGIN. Jam yang belum dirilis tetap ditandai sebagai menunggu.",
-        )
-        ui._render_hourly_cards(rh, pred)
+        with st.container(key="dg_lower"):
+            chart_col, analysis_col = st.columns([1.6, 1], gap="large")
+            with chart_col:
+                design.render_journey(mh, rh, pred)
+            with analysis_col:
+                design.render_insights(monitor, pred, result)
 
         ui._section(
             "EKSPLORASI DATA",
             "Bandingkan parameter dan probabilitas model",
             "Pilih kombinasi variabel apa pun pada setiap grafik. Setiap seri memakai skala otomatis sendiri agar arah tren tetap terlihat.",
         )
-        features.render_custom_explorer(
-            mh,
-            rh,
-            key_prefix="prediction_explore",
-            include_models=True,
-            default_labels=["Suhu udara", "Probabilitas Stacked / Final"],
-            allow_download=False,
-        )
+        with st.expander("Eksplorasi lanjutan & perbandingan variabel"):
+            features.render_custom_explorer(
+                mh, rh, key_prefix="prediction_explore", include_models=True,
+                default_labels=["Suhu udara", "Probabilitas Stacked / Final"],
+                allow_download=False,
+            )
 
     elif page == "Prospek BMKG":
         ui._section(
@@ -305,6 +319,7 @@ def dashboard() -> None:
 
     else:
         features.render_monitoring_cards(monitor)
+        design.render_journey(mh, pd.DataFrame(), {}, include_models=False)
         latest_obs = monitor.get("latest_observation") or {}
         fresh, _, _ = base.freshness(latest_obs.get("time_wib"), now)
         _render_notices(monitor, pipeline, statuses["monitoring"], fresh)

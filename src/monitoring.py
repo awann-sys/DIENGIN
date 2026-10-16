@@ -53,6 +53,10 @@ DISPLAY_PARAMETERS = [
     "rr",
     "pp_air",
     "dew_point_c",
+    "tt_air_max",
+    "ws_max",
+    "sr_avg",
+    "sr_max",
 ]
 
 FLAG_COLUMNS = [

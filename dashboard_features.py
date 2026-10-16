@@ -40,6 +40,10 @@ WEATHER_VARS = {
     "Tekanan udara": ("pp_air", "hPa"),
     "Titik embun": ("dew_point_c", "°C"),
     "Arah angin": ("wd_avg", "°"),
+    "Suhu maksimum AWS": ("tt_air_max", "°C"),
+    "Angin maksimum AWS": ("ws_max", "unit AWS"),
+    "Radiasi rata-rata AWS": ("sr_avg", "unit AWS"),
+    "Radiasi maksimum AWS": ("sr_max", "unit AWS"),
 }
 MODEL_VARS = {
     "Probabilitas ANN": ("ann_prob", "%"),
@@ -164,13 +168,11 @@ def render_prediction_weather(monitor: dict, history: pd.DataFrame | None, now: 
         f'<p>{html.escape(str(station))} · observasi {html.escape(str(obs_time))}</p></div>'
         '<div class="dg-primary-grid">'
         + _card("Suhu terkini", p.get("tt_air_avg"), "°C", _trend_note(trend.get("tt_air_avg_change"), "°C"), True)
-        + _card("Suhu terendah malam ini", low, "°C", low_note, True)
-        + '</div><div class="dg-secondary-grid">'
         + _card("Kelembapan relatif", p.get("rh_avg"), "%", rh_note)
         + _card("Kecepatan angin", p.get("ws_avg"), "", _trend_note(trend.get("ws_avg_change"), "unit AWS"))
-        + _card("Curah / pembacaan hujan", p.get("rr"), "mm", rain_note)
+        + _card("Titik embun", p.get("dew_point_c"), "°C", "Dihitung dari suhu dan RH")
         + '</div>'
-        f'<div class="dg-secondary-line">Tekanan {_fmt(p.get("pp_air"))} hPa · Titik embun {_fmt(p.get("dew_point_c"))} °C · Arah angin {_fmt(p.get("wd_avg"),0)}°</div>'
+        f'<div class="dg-secondary-line">Minimum malam ini {_fmt(low)} °C · {html.escape(low_note)} · Hujan {_fmt(rain)} mm · Tekanan {_fmt(p.get("pp_air"))} hPa</div>'
         '</section>'
     )
     st.markdown(html_block, unsafe_allow_html=True)
@@ -192,6 +194,10 @@ def render_monitoring_cards(monitor: dict) -> None:
         ("Curah / pembacaan hujan", p.get("rr"), "mm", "Observasi terbaru"),
         ("Tekanan udara", p.get("pp_air"), "hPa", "Observasi terbaru"),
         ("Titik embun", p.get("dew_point_c"), "°C", "Dihitung dari suhu dan RH"),
+        ("Suhu maksimum AWS", p.get("tt_air_max"), "°C", "Nilai maksimum dari field AWS"),
+        ("Angin maksimum AWS", p.get("ws_max"), "unit AWS", "Satuan mengikuti sumber AWS"),
+        ("Radiasi rata-rata AWS", p.get("sr_avg"), "unit AWS", "Satuan mengikuti sumber AWS"),
+        ("Radiasi maksimum AWS", p.get("sr_max"), "unit AWS", "Satuan mengikuti sumber AWS"),
     ]
     st.markdown(
         '<section class="dg-current-wrap"><div class="dg-current-head"><h2>Monitoring AWS</h2>'
@@ -430,7 +436,7 @@ def fetch_aws_history(start_wib_iso: str, end_wib_iso: str) -> pd.DataFrame:
     df = df[df.get("id_station", "").astype(str).eq(AWS_STATION_ID)].copy()
     dt = pd.to_datetime(df.get("tanggal"), utc=True, errors="coerce")
     df["_time"] = dt.dt.tz_convert(WIB)
-    for col in ["rr","ws_avg","wd_avg","tt_air_avg","tt_air_min","rh_avg","pp_air"]:
+    for col in ["rr","ws_avg","wd_avg","tt_air_avg","tt_air_min","rh_avg","pp_air","tt_air_max","ws_max","sr_avg","sr_max"]:
         if col not in df:
             df[col] = pd.NA
         df[col] = pd.to_numeric(df[col], errors="coerce")
