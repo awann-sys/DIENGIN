@@ -1,0 +1,2 @@
+tanggal_target,jam_rilis_wib,waktu_rilis_wib,waktu_pengamatan_terakhir_wib,tmin_now,tmin_min_1h,temp_drop_1h,tmin_anom_month,rh_mean_1h,dp_depress,dpdep_anom_month,ws_mean_1h,ws_max_1h,rr_10min,rr_sum_3h,is_rain_now,doy_sin,doy_cos,hour_sin,hour_cos
+2026-10-18,2,2026-10-18 02:00:00+07:00,2026-10-18 01:50:00+07:00,8.14,8.14,1.459999999999999,-4.969999999999999,96.14999999999999,0.43356127421076796,-0.08060932171312274,0.0,0.0,0.0,0.0,0.0,-0.957232443323312,0.28931997761869527,0.46174861323503397,0.8870108331782217
