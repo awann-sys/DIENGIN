@@ -548,9 +548,36 @@ def render_interactive_chart(series, key, unit, label):
     st.caption('Arahkan ke titik untuk detail. Gulir untuk zoom; geser untuk menjelajah. Jam tanpa data tetap menjadi jeda.')
 
 
+@st.cache_data(ttl=900, show_spinner=False)
+def fetch_stored_aws_archive(start_iso, end_iso):
+    import gzip
+    start, end = pd.Timestamp(start_iso), pd.Timestamp(end_iso)
+    if end <= start or end - start > pd.Timedelta(days=31):
+        raise ValueError('Pilih rentang valid maksimum 31 hari.')
+    frames = []
+    for month in pd.period_range(start.tz_localize(None).to_period('M'), end.tz_localize(None).to_period('M'), freq='M'):
+        url = f'https://raw.githubusercontent.com/awann-sys/DIENGIN/aws-archive/observations/{month}.csv.gz'
+        try:
+            with urllib.request.urlopen(url, timeout=30) as response:
+                frames.append(pd.read_csv(io.BytesIO(gzip.decompress(response.read()))))
+        except urllib.error.HTTPError as error:
+            if error.code != 404:
+                raise
+    if not frames:
+        return pd.DataFrame()
+    data = pd.concat(frames, ignore_index=True)
+    data['_time'] = pd.to_datetime(data['datetime_utc'], utc=True).dt.tz_convert(WIB)
+    for col in list(data.columns):
+        if col.endswith('_flag') and col[:-5] in data:
+            data.loc[pd.to_numeric(data[col], errors='coerce').eq(1), col[:-5]] = float('nan')
+    return data[data['_time'].between(start, end)].sort_values('_time').drop_duplicates('_time')
+
+
 def render_on_demand_monitoring_explorer() -> None:
     st.subheader("Eksplorasi Data AWS")
     st.caption("Pilih rentang tanggal dan jam. Data baru diminta dari AWS BMKG setelah tombol Muat Data ditekan.")
+    source = st.selectbox('Sumber histori', ['Arsip tersimpan', 'Ambil langsung dari BMKG'], key='aws_history_source')
+    st.caption('Arsip sejak 2020 sedang diisi bertahap; tanggal tanpa hasil belum tentu berarti stasiun tidak merekam. Permintaan dibatasi 31 hari.')
     now = pd.Timestamp.now(tz=WIB).floor("10min")
     default_start = now - pd.Timedelta(hours=12)
     c1, c2 = st.columns(2)
@@ -565,7 +592,8 @@ def render_on_demand_monitoring_explorer() -> None:
         end = pd.Timestamp(datetime.combine(end_date, end_time), tz=WIB)
         try:
             with st.spinner("Mengunduh data AWS BMKG…"):
-                st.session_state["aws_requested_history"] = fetch_aws_history(start.isoformat(), end.isoformat())
+                reader = fetch_stored_aws_archive if source == 'Arsip tersimpan' else fetch_aws_history
+                st.session_state["aws_requested_history"] = reader(start.isoformat(), end.isoformat())
             st.session_state["aws_requested_range"] = (start, end)
         except (ValueError, RuntimeError, urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, json.JSONDecodeError):
             st.session_state.pop('aws_requested_history', None)
