@@ -82,6 +82,11 @@ CARD_CSS = r"""
  .dg-current-head h2{font-size:1.65rem}.dg-weather-card.primary .dg-weather-value{font-size:2.55rem}
 }
 
+.dg-prediction-instruments{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1rem;margin:1rem 0 1.4rem}
+.dg-prediction-instruments .dg-weather-card.instrument{min-height:200px}
+@media(max-width:1050px){.dg-prediction-instruments{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:620px){.dg-prediction-instruments{grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem}.dg-prediction-instruments .dg-weather-card.instrument{min-height:165px}}
+@media(max-width:380px){.dg-prediction-instruments{grid-template-columns:1fr}}
 /* DIENGIN Weather Instruments v2 — scoped to current cards only */
 .dg-all-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1.1rem}
 .dg-all-grid .dg-weather-card{min-height:190px}
@@ -180,15 +185,18 @@ def render_prediction_weather(monitor: dict, history: pd.DataFrame | None, now: 
     obs_time = latest.get("time_wib") or "—"
     station = (monitor.get("station") or {}).get("station_name") or "AWS Batur Dieng"
 
+    cards = [
+        ("Suhu terkini", p.get("tt_air_avg"), "°C", _trend_note(trend.get("tt_air_avg_change"), "°C"), "tt_air_avg"),
+        ("Kelembapan relatif", p.get("rh_avg"), "%", rh_note, "rh_avg"),
+        ("Kecepatan angin", p.get("ws_avg"), "unit AWS", _trend_note(trend.get("ws_avg_change"), "unit AWS"), "ws_avg"),
+        ("Titik embun", p.get("dew_point_c"), "°C", "Dihitung dari suhu dan RH", "dew_point_c"),
+    ]
     html_block = (
         '<section class="dg-current-wrap"><div class="dg-current-head">'
         '<h2>Kondisi Cuaca Terkini</h2>'
         f'<p>{html.escape(str(station))} · observasi {html.escape(str(obs_time))}</p></div>'
-        '<div class="dg-primary-grid">'
-        + _card("Suhu terkini", p.get("tt_air_avg"), "°C", _trend_note(trend.get("tt_air_avg_change"), "°C"), True)
-        + _card("Kelembapan relatif", p.get("rh_avg"), "%", rh_note)
-        + _card("Kecepatan angin", p.get("ws_avg"), "", _trend_note(trend.get("ws_avg_change"), "unit AWS"))
-        + _card("Titik embun", p.get("dew_point_c"), "°C", "Dihitung dari suhu dan RH")
+        '<div class="dg-prediction-instruments">'
+        + ''.join(_instrument_card(*item) for item in cards)
         + '</div>'
         f'<div class="dg-secondary-line">Minimum malam ini {_fmt(low)} °C · {html.escape(low_note)} · Hujan {_fmt(rain)} mm · Tekanan {_fmt(p.get("pp_air"))} hPa</div>'
         '</section>'
