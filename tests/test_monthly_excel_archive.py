@@ -11,7 +11,7 @@ class MonthlyArchiveTests(unittest.TestCase):
     def test_url_year_and_leap_month(self):
         now = date(2026, 10, 20)
         self.assertIn('/downloadaccesdata_year/2024/aws/STA2285/2024-02-01/2024-02-29', month_url(2024, 2, now))
-        self.assertIn('/downloadaccesdata/aws/STA2285/2026-10-01/2026-10-20', month_url(2026, 10, now))
+        self.assertIn('/downloadaccesdata_currentyear/aws/STA2285/2026-10-01/2026-10-20', month_url(2026, 10, now))
 
     def test_clean_flags_duplicates_missing_and_wib(self):
         source = pd.DataFrame({'ID Stasiun': ['STA2285'] * 3, 'Tanggal': ['2021-01-01 00:00:00+00', '2021-01-01 00:00:00+00', 'bad'], 'tt_air_avg': [5., 6., 9.], 'tt_air_avg_flag': [0, 1, 0], 'rr': [0., None, 2.]})

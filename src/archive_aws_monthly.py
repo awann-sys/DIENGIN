@@ -21,7 +21,7 @@ META = {'ID Stasiun': 'id_station', 'Nama Stasiun': 'station_name', 'Lattitude':
 
 def month_url(year, month, today):
     last = min(calendar.monthrange(year, month)[1], today.day) if (year, month) == (today.year, today.month) else calendar.monthrange(year, month)[1]
-    route = 'downloadaccesdata' if year == today.year else f'downloadaccesdata_year/{year}'
+    route = 'downloadaccesdata_currentyear' if year == today.year else f'downloadaccesdata_year/{year}'
     return f'{BASE}/{route}/aws/STA2285/{year}-{month:02d}-01/{year}-{month:02d}-{last:02d}'
 
 
@@ -83,6 +83,8 @@ def run(root, limit=72):
     # Refresh the current month every run, then continue pending historical months.
     def needs_refresh(year, month):
         entry = state['months_checked'].get(f'{year}-{month:02d}', {})
+        if entry.get('url') != month_url(year, month, today):
+            return True
         if entry.get('status') not in ('downloaded', 'empty'):
             return True
         if entry.get('status') == 'empty':
@@ -109,6 +111,23 @@ def run(root, limit=72):
                     raise ValueError(f'Not an Excel download: HTTP {response.status_code}')
                 (root / 'raw' / f'{name}.xlsx').write_bytes(response.content)
                 frame, audit = clean_excel(response.content)
+                # currentyear can lag the live export. Merge the live month as
+                # an additional source, with newer live records taking priority.
+                if (year, month) == (today.year, today.month):
+                    recent_url = url.replace('/downloadaccesdata_currentyear/', '/downloadaccesdata/')
+                    recent_response = session.get(recent_url, timeout=120)
+                    if recent_response.status_code != 200 or not recent_response.content.startswith(b'PK'):
+                        raise ValueError('Live monthly supplement failed')
+                    (root / 'raw' / f'{name}_recent.xlsx').write_bytes(recent_response.content)
+                    recent, recent_audit = clean_excel(recent_response.content)
+                    combined = pd.concat([frame, recent], ignore_index=True)
+                    overlap = int(combined.duplicated(['id_station', 'datetime_utc']).sum())
+                    frame = combined.drop_duplicates(['id_station', 'datetime_utc'], keep='last').sort_values('datetime_utc')
+                    audit = {key: audit[key] + recent_audit[key] for key in audit}
+                    audit['duplicate_rows'] += overlap
+                    audit['clean_rows'] = len(frame)
+                    entry['supplement_url'] = recent_url
+                    entry['supplement_rows'] = len(recent)
                 # Range endpoints in rawdata exports are UTC dates; keep WIB conversion explicit.
                 times = pd.to_datetime(frame['datetime_utc'], utc=True)
                 unexpected = int((times.dt.year.ne(year) | times.dt.month.ne(month)).sum())
@@ -121,7 +140,7 @@ def run(root, limit=72):
                 failure = True
             state['months_checked'][name] = entry
             state['months'] = sorted(p.name[:7] for p in (root / 'observations').glob('*.csv.gz'))
-            remaining = [f'{y}-{m:02d}' for y, m in months if state['months_checked'].get(f'{y}-{m:02d}', {}).get('status') not in ('downloaded', 'empty')]
+            remaining = [f'{y}-{m:02d}' for y, m in months if needs_refresh(y, m)]
             state['next_month'] = remaining[0] if remaining else None
             state['backfill_complete'] = not remaining
             state['updated_utc'] = datetime.now(timezone.utc).isoformat()

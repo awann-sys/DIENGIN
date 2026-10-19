@@ -4,7 +4,11 @@ Sumber historis bulanan adalah ekspor Excel resmi BMKG, bukan API `/getdata`
 yang membatasi rentang 24 jam. ID stasiun `STA2285`.
 
 - Tahun lampau: `/rawdata/downloadaccesdata_year/TAHUN/aws/STA2285/MULAI/SELESAI`.
-- Tahun berjalan: `/rawdata/downloadaccesdata/aws/STA2285/MULAI/SELESAI`.
+- Tahun berjalan: `/rawdata/downloadaccesdata_currentyear/aws/STA2285/MULAI/SELESAI`.
+- Bulan berjalan dilengkapi `/rawdata/downloadaccesdata/aws/STA2285/MULAI/SELESAI`
+  karena ekspor `currentyear` dapat tertinggal dari data terbaru. File suplemen
+  disimpan terpisah sebagai `raw/YYYY-MM_recent.xlsx`; timestamp yang sama
+  memakai versi suplemen terbaru, tanpa menambah duplikat.
 - Tanggal mulai: hari pertama bulan. Tanggal akhir: hari terakhir bulan,
   atau tanggal hari ini untuk bulan berjalan. Tahun URL berubah otomatis.
 
