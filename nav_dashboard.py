@@ -111,9 +111,9 @@ def _top_nav() -> str:
               "Prospek BMKG": "Tentang"}
     if previous is not None and previous not in options:
         st.session_state["dg_primary_nav"] = legacy.get(previous, "Prediksi Frost")
-    # Equal side columns keep the center navigation genuinely centered.
+    # Brand at the left, navigation at the right, matching the public website.
     with st.container(key="dg_topbar"):
-        brand_col, nav_col, theme_col = st.columns([1.0, 1.75, 1.0], vertical_alignment="center")
+        brand_col, nav_col = st.columns([1, 2], vertical_alignment="center")
         with brand_col:
             st.markdown(
                 '<div class="dg-top-brand">'
@@ -131,9 +131,6 @@ def _top_nav() -> str:
                     key="dg_primary_nav",
                     label_visibility="collapsed",
                 )
-        with theme_col:
-            with st.container(key="dg_theme_col"):
-                theme.render_toggle()
     return page or "Prediksi Frost"
 
 
@@ -279,7 +276,7 @@ def dashboard() -> None:
     page = _top_nav()
     # Dedicated Web 2.0 heading for each page; the live scene is inside hero.
     if page == "Prediksi Frost":
-        web2.render_page_intro("Prediksi Frost", "Pantau potensi frost dan kondisi meteorologi terbaru di Dataran Tinggi Dieng.")
+        web2.render_page_intro("Prediksi Frost di Dataran Tinggi Dieng", "Data dari pipeline DIENGIN · Stasiun AWS Batur Dieng", "DIENG PLATEAU · SISTEM PREDIKSI FROST")
     elif page == "Monitoring AWS":
         web2.render_page_intro("Monitoring AWS", "Pantau parameter cuaca AWS Batur serta grafik observasi per jam.")
     elif page == "Tren & Historis":
