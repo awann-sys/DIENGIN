@@ -18,13 +18,13 @@ CSS = r"""
 <style>
 /* Web 2.0 design system. Loaded AFTER the older UI/theme styles. */
 :root{
- --web2-navy:#12313c;--web2-teal:#137f85;--web2-muted:#68818b;
- --web2-paper:#f5faf9;--web2-mint:#dff3ef;--web2-border:#e3eeec;
+ --web2-navy:var(--dg-ink);--web2-teal:var(--dg-blue);--web2-muted:var(--dg-muted);
+ --web2-paper:var(--dg-surface);--web2-mint:var(--dg-soft);--web2-border:var(--dg-border);
 }
 [data-testid="stAppViewContainer"]{background:var(--web2-paper)!important}
 .block-container{max-width:1550px!important;padding:1.25rem 2rem 4rem!important}
 .st-key-dg_topbar{position:sticky!important;top:.25rem!important;z-index:1001!important;margin:.15rem 0 1.3rem!important}
-.st-key-dg_topbar>div{background:rgba(255,255,255,.97)!important;border:1px solid var(--web2-border)!important;border-radius:18px!important;box-shadow:0 12px 34px rgba(18,49,60,.08)!important;padding:.8rem 1.1rem!important;backdrop-filter:blur(18px)}
+.st-key-dg_topbar>div{background:var(--dg-card)!important;border:1px solid var(--web2-border)!important;border-radius:18px!important;box-shadow:0 12px 34px rgba(18,49,60,.08)!important;padding:.8rem 1.1rem!important;backdrop-filter:blur(18px)}
 .dg-top-brand{color:var(--web2-teal)!important;font-size:1.65rem!important;font-weight:900!important;letter-spacing:.02em!important}
 .dg-top-brand-badge{background:transparent!important;color:var(--web2-teal)!important;box-shadow:none!important;font-size:30px!important;align-self:flex-start;line-height:1!important;height:1em!important}
 .dg-top-brand-badge svg{display:block;width:1em;height:1em}
@@ -36,7 +36,7 @@ CSS = r"""
 .dg2-eyebrow{color:var(--web2-teal);font-weight:850;letter-spacing:.13em;font-size:.75rem;text-transform:uppercase}
 .dg2-page-intro h1{color:var(--web2-navy);font-size:clamp(2rem,3.2vw,3rem);letter-spacing:-.047em;margin:.27rem 0!important;line-height:1.14}
 .dg2-page-intro p{color:var(--web2-muted);font-size:1rem;margin:.3rem 0 0}
-.dg2-hero{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(300px,1fr);min-height:410px;border:1px solid #d6e9e7;border-radius:29px;overflow:hidden;box-shadow:0 16px 46px rgba(18,49,60,.08);background:#edf8f5;margin:.85rem 0 1.8rem}
+.dg2-hero{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(300px,1fr);min-height:410px;border:1px solid var(--dg-border);border-radius:29px;overflow:hidden;box-shadow:0 16px 46px rgba(18,49,60,.08);background:var(--dg-soft);margin:.85rem 0 1.8rem}
 .dg2-risk{padding:2.05rem 2.3rem;background:linear-gradient(135deg,#12313c 0%,#18454c 68%,#216167 100%);color:#fff!important;display:flex;flex-direction:column;align-items:flex-start}
 .dg2-risk *{color:#fff!important}
 .dg2-risk .dg2-risk-kicker{font-size:.74rem;letter-spacing:.115em;font-weight:800;color:#a9dfdb!important}
@@ -50,24 +50,24 @@ CSS = r"""
 .dg2-risk-meta{width:100%;display:flex;gap:.6rem;flex-wrap:wrap;justify-content:space-between;font-size:.76rem;color:#c0d9db!important}
 .dg2-risk-meta span{color:#c0d9db!important}
 .dg2-risk-explain{max-width:640px;line-height:1.55;color:#d4e5e4!important;font-size:.85rem;margin:1rem 0 0}
-.dg2-scene-area{display:flex;flex-direction:column;justify-content:space-around;align-items:center;padding:1.6rem 1.4rem;text-align:center;background:radial-gradient(circle at 50% 28%,#f7fffd 0%,#e7f5f2 55%,#dff0ee 100%);color:var(--web2-navy)}
+.dg2-scene-area{display:flex;flex-direction:column;justify-content:space-around;align-items:center;padding:1.6rem 1.4rem;text-align:center;background:radial-gradient(circle at 50% 28%,var(--dg-card) 0%,var(--dg-soft) 100%);color:var(--web2-navy)}
 .dg2-scene-head{font-size:.8rem;font-weight:850;letter-spacing:.08em;color:var(--web2-teal)}
 .dg2-scene-art{display:grid;place-items:center;min-height:192px;width:100%}
 .dg2-scene-art .dg-scene{transform:scale(1.42);transform-origin:center center;margin:15px auto 20px}
 .dg2-scene-caption{font-weight:800;font-size:1.05rem;color:var(--web2-navy)}
 .dg2-scene-sub{font-size:.73rem;color:var(--web2-muted);margin-top:3px}
-.dg2-scene-detail{display:flex;gap:1rem;align-items:center;justify-content:space-around;background:rgba(255,255,255,.84);border:1px solid #d6e8e5;border-radius:14px;padding:.75rem 1rem;width:100%;margin-top:1rem}
+.dg2-scene-detail{display:flex;gap:1rem;align-items:center;justify-content:space-around;background:var(--dg-card);border:1px solid var(--dg-border);border-radius:14px;padding:.75rem 1rem;width:100%;margin-top:1rem}
 .dg2-scene-detail div{display:flex;flex-direction:column;gap:3px;min-width:0}
 .dg2-scene-detail small{font-size:.69rem;color:var(--web2-muted)}
 .dg2-scene-detail strong{font-size:1rem;color:var(--web2-navy);font-variant-numeric:tabular-nums}
-.dg2-scene-detail .dg2-separator{width:1px;min-width:1px;align-self:stretch;background:#dceae6}
+.dg2-scene-detail .dg2-separator{width:1px;min-width:1px;align-self:stretch;background:var(--dg-border)}
 .dg-current-wrap{margin:1.8rem 0!important}
 .dg-current-head{margin-bottom:1rem!important}
 .dg-current-head h2{font-size:1.58rem!important;letter-spacing:-.035em!important;color:var(--web2-navy)!important}
 .dg-current-head p{font-size:.85rem!important;color:var(--web2-muted)!important}
 .dg-all-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:1.1rem!important}
 .dg-prediction-instruments{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:1rem!important}
-.dg-weather-card.instrument{background:linear-gradient(135deg,var(--accent-bg),#fff 82%)!important;border:1px solid var(--web2-border)!important;box-shadow:0 5px 19px rgba(22,55,63,.045)!important;min-height:180px!important;text-align:left!important;border-radius:22px!important}
+.dg-weather-card.instrument{background:linear-gradient(135deg,color-mix(in srgb,var(--accent-bg) 12%,var(--dg-card)),var(--dg-card) 82%)!important;border:1px solid var(--web2-border)!important;box-shadow:0 5px 19px rgba(22,55,63,.045)!important;min-height:180px!important;text-align:left!important;border-radius:22px!important}
 .dg-weather-card.instrument::before{content:none!important;display:none!important}
 .dg-weather-card.instrument .dg-weather-value{font-size:clamp(2.9rem,4vw,4.65rem)!important;font-weight:850!important;letter-spacing:-.065em!important;line-height:1.04!important}
 .dg-prediction-instruments .dg-weather-card.instrument .dg-weather-value{font-size:clamp(2.45rem,3.35vw,3.95rem)!important}
