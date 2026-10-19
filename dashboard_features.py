@@ -123,6 +123,19 @@ def _fmt(value: Any, digits: int = 1) -> str:
     return f"{number:.{digits}f}".replace(".", ",")
 
 
+def _observation_label(value: Any) -> str:
+    """Readable timestamp in WIB; unknown times are never inferred."""
+    try:
+        stamp = pd.Timestamp(value)
+        if pd.isna(stamp):
+            return "waktu tidak tersedia"
+        stamp = stamp.tz_localize(WIB) if stamp.tzinfo is None else stamp.tz_convert(WIB)
+        months = ("Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des")
+        return f"{stamp.day} {months[stamp.month-1]} {stamp.year}, {stamp:%H.%M} WIB"
+    except (ValueError, TypeError, OverflowError):
+        return "waktu tidak tersedia"
+
+
 def _trend_note(value: Any, unit: str) -> str:
     change = _num(value)
     if change is None:
@@ -182,7 +195,7 @@ def render_prediction_weather(monitor: dict, history: pd.DataFrame | None, now: 
     rh_note = "Tidak tersedia / tidak lolos QC" if rh is None else _trend_note(trend.get("rh_avg_change"), "poin %")
     rain = _num(p.get("rr"))
     rain_note = "Tidak ada hujan" if rain == 0 else "Pembacaan AWS terbaru" if rain is not None else "Belum tersedia"
-    obs_time = latest.get("time_wib") or "—"
+    obs_time = _observation_label(latest.get("time_wib"))
     station = (monitor.get("station") or {}).get("station_name") or "AWS Batur Dieng"
 
     cards = [
