@@ -50,6 +50,8 @@ def run(root, limit):
         for day in [today - timedelta(days=1), today]:
             count = download_day(session, token, day, root)
             state['days'][day.date().isoformat()] = {'rows_received': count, 'checked_utc': datetime.now(timezone.utc).isoformat()}
+            state['updated_utc'] = datetime.now(timezone.utc).isoformat()
+            manifest.write_text(json.dumps(state, indent=2))
             time.sleep(2)
         cursor = datetime.fromisoformat(state['next_day_utc']).replace(tzinfo=timezone.utc)
         for _ in range(limit):

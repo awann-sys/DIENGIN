@@ -4,6 +4,9 @@ on:
     branches: [main]
     paths: [src/archive_aws.py, .github/workflows/aws-archive.yml]
   workflow_dispatch:
+  workflow_run:
+    workflows: [DIENGIN Cloud Pipeline]
+    types: [completed]
   schedule:
     - cron: '11 * * * *'
 permissions:
@@ -13,6 +16,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   archive:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
