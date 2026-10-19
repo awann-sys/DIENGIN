@@ -1,0 +1,22 @@
+name: Weather Cards UI Checks
+on:
+  pull_request:
+    paths:
+      - dashboard_features.py
+      - tests/test_weather_instrument_cards.py
+      - .github/workflows/weather-card-checks.yml
+  workflow_dispatch:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dashboard dependencies
+        run: pip install streamlit pandas
+      - name: Compile Python files
+        run: python -m py_compile dashboard_features.py nav_dashboard.py expressive_dashboard.py
+      - name: Test weather instruments
+        run: python -m unittest discover -s tests -p 'test_weather_instrument_cards.py' -v
