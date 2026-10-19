@@ -28,6 +28,7 @@ import json
 import math
 import os
 import sys
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -102,21 +103,55 @@ def get_token(session: requests.Session) -> str:
             "AWS_API_USERNAME dan AWS_API_PASSWORD sebagai environment variable."
         )
 
-    response = session.post(
-        LOGIN_URL,
-        params={"username": username, "password": password},
-        timeout=REQUEST_TIMEOUT,
-    )
-    response.raise_for_status()
+    # BMKG documents POST with username/password as query parameters.
+    # Never propagate requests.HTTPError: its string includes the full URL
+    # (and therefore the credentials) into logs and status JSON.
+    retryable = {429, 500, 502, 503, 504}
+    pauses = (5, 15)
+    for attempt in range(3):
+        try:
+            response = session.post(
+                LOGIN_URL,
+                params={"username": username, "password": password},
+                timeout=REQUEST_TIMEOUT,
+            )
+        except requests.RequestException:
+            if attempt < 2:
+                time.sleep(pauses[attempt])
+                continue
+            raise RuntimeError(
+                "Login AWS BMKG gagal karena masalah koneksi setelah 3 percobaan."
+            ) from None
 
-    payload = response.json()
+        code = response.status_code
+        if code in retryable:
+            if attempt < 2:
+                time.sleep(pauses[attempt])
+                continue
+            raise RuntimeError(
+                f"Login AWS BMKG HTTP {code} setelah 3 percobaan; "
+                "endpoint kemungkinan sedang bermasalah atau membatasi akses."
+            )
 
-    if payload.get("status") != "sukses" or not payload.get("token"):
-        raise RuntimeError(
-            f"Login API gagal: {payload.get('message', payload)}"
-        )
+        if code >= 400:
+            raise RuntimeError(
+                f"Login AWS BMKG HTTP {code}; cek akses API dan kredensial. "
+                "URL autentikasi sengaja tidak ditampilkan."
+            )
 
-    return str(payload["token"]).strip()
+        try:
+            payload = response.json()
+        except ValueError:
+            raise RuntimeError("Respons login AWS BMKG bukan JSON yang valid.") from None
+
+        if not isinstance(payload, dict) or payload.get("status") != "sukses" or not payload.get("token"):
+            raise RuntimeError(
+                "Login AWS BMKG tidak berhasil; periksa izin akun/token melalui pengelola API."
+            )
+
+        return str(payload["token"]).strip()
+
+    raise RuntimeError("Login AWS BMKG gagal setelah 3 percobaan.")
 
 
 def utc_request_window() -> tuple[datetime, datetime]:
@@ -170,12 +205,19 @@ def request_data(
             "id_station": STATION_ID,
         }
 
-        response = session.get(
-            DATA_URL,
-            params=params,
-            timeout=REQUEST_TIMEOUT,
-        )
-        response.raise_for_status()
+        try:
+            response = session.get(
+                DATA_URL,
+                params=params,
+                timeout=REQUEST_TIMEOUT,
+            )
+        except requests.RequestException:
+            raise RuntimeError("Gagal menghubungi API data AWS BMKG.") from None
+        if response.status_code >= 400:
+            raise RuntimeError(
+                f"API data AWS BMKG HTTP {response.status_code}. "
+                "URL yang mengandung token tidak dicatat."
+            )
 
         payload = response.json()
 
