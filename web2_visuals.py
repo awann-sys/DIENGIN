@@ -110,6 +110,41 @@ CSS = r"""
  .dg-all-grid,.dg-prediction-instruments{grid-template-columns:1fr!important}
  .dg-weather-card.instrument .dg-weather-value{font-size:3.3rem!important}
 }
+/* Public website alignment. Keep this last to supersede legacy dashboard CSS. */
+[data-testid="stHeader"]{background:transparent!important;pointer-events:none}
+[data-testid="stHeader"] button{pointer-events:auto}
+[data-testid="stElementContainer"]:has([data-testid="stMarkdownContainer"] > style){display:none!important}
+.block-container{max-width:1440px!important;padding:0 4rem 4rem!important}
+.st-key-dg_topbar{position:relative!important;top:auto!important;margin:0 0 2.5rem!important;padding:1.15rem 0!important;isolation:isolate}
+.st-key-dg_topbar::before{content:"";position:absolute;inset:0 calc((100% - 100vw)/2);background:#fff;z-index:-1}
+.st-key-dg_topbar>div{background:transparent!important;border:0!important;border-radius:0!important;box-shadow:none!important;padding:0!important;backdrop-filter:none!important}
+.st-key-dg_topbar [data-testid="stColumn"]{min-width:0!important}
+.dg-top-brand{font-size:1.65rem!important;gap:.5rem!important;line-height:1.1!important}
+.dg-top-brand-badge{width:26px!important;flex-basis:26px!important;font-size:27px!important}
+.dg-web2-brandcopy small{font-size:.61rem!important;letter-spacing:.12em!important}
+.st-key-dg_nav_control,.st-key-dg_nav_control [data-testid="stSegmentedControl"]{justify-content:flex-end!important;margin-left:auto!important;margin-right:0!important}
+.st-key-dg_nav_control button{border:0!important;box-shadow:none!important;border-radius:12px!important;min-width:0!important;min-height:44px!important;font-size:.9rem!important;padding:.65rem .95rem!important}
+.st-key-dg_nav_control button p{font-size:inherit!important}
+.dg2-page-intro{margin:0 0 2rem!important}
+.dg2-page-intro h1{font-size:clamp(1.9rem,3.2vw,3rem)!important;letter-spacing:-.035em!important;margin:.9rem 0 1rem!important}
+.dg2-hero{display:block;max-width:960px;border:0;border-radius:28px;box-shadow:none;background:#12313c;margin:0 0 2rem}
+.dg2-risk{padding:2.1rem;background:#12313c;min-height:380px}
+.dg2-number{font-size:clamp(5rem,9vw,8.1rem);letter-spacing:-.055em;margin:1.8rem 0}
+.dg2-number span{font-size:1em;letter-spacing:inherit;margin-left:0}
+.dg2-risk-status{border:0;background:none;border-radius:0;padding:0;color:#f5bd79!important;font-size:1rem}
+.dg2-scene-area{display:none}
+@media(max-width:760px){
+ .block-container{padding:0 1rem 2rem!important}
+ .st-key-dg_topbar{padding:1rem 0!important;margin-bottom:1.5rem!important}
+ .st-key-dg_topbar [data-testid="stHorizontalBlock"]{gap:.8rem!important}
+ .st-key-dg_topbar [data-testid="stColumn"]:first-child{flex:1 0 100%!important;width:100%!important}
+ .dg-top-brand span:last-child{display:flex!important}
+ .st-key-dg_nav_control{justify-content:flex-start!important}
+ .st-key-dg_nav_control button{font-size:.78rem!important;padding:.5rem .65rem!important}
+ .dg2-page-intro h1{font-size:1.9rem!important}
+ .dg2-risk{padding:1.5rem;min-height:0}
+ .dg2-hero{border-radius:22px}
+}
 </style>
 """
 
@@ -229,3 +264,4 @@ def render_page_intro(title: str, subtitle: str, eyebrow: str = "DIENGIN · Fros
         f'<h1>{_safe(title)}</h1><p>{_safe(subtitle)}</p></div>',
         unsafe_allow_html=True,
     )
+
