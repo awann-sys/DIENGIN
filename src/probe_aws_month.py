@@ -1,5 +1,7 @@
 """Verify monthly AWS responses against a known nonempty daily request."""
 import json
+import os
+import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -43,7 +45,12 @@ def main():
                 result, keys[label] = fetch_window(session, token, start, end, root)
                 report['results'][label] = {'request_start_wib': start.isoformat(), 'request_end_wib': end.isoformat(), 'status': 'ok', **result}
             except Exception as error:
-                report['results'][label] = {'status': 'error', 'error_type': type(error).__name__}
+                detail = str(error)
+                for secret in [token, os.getenv('AWS_API_USERNAME'), os.getenv('AWS_API_PASSWORD')]:
+                    if secret:
+                        detail = detail.replace(secret, '[redacted]')
+                detail = re.sub(r'https?://\S+', '[URL redacted]', detail)
+                report['results'][label] = {'status': 'error', 'error_type': type(error).__name__, 'detail': detail[:240]}
             (root / 'monthly_probe.json').write_text(json.dumps(report, indent=2))
         reference = keys.get('reference_day', set())
         report['monthly_contains_reference_day'] = bool(reference) and reference.issubset(keys.get('current_month', set()))
