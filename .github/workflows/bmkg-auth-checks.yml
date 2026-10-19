@@ -1,0 +1,22 @@
+name: BMKG AWS Auth Safety Checks
+on:
+  pull_request:
+    paths:
+      - src/download_aws.py
+      - tests/test_bmkg_auth.py
+      - .github/workflows/bmkg-auth-checks.yml
+  workflow_dispatch:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install minimum test dependencies
+        run: python -m pip install --retries 6 --timeout 90 pandas requests
+      - name: Syntax checks
+        run: python -m py_compile src/download_aws.py tests/test_bmkg_auth.py
+      - name: Authentication tests
+        run: python -m unittest discover -s tests -p 'test_bmkg_auth.py' -v
