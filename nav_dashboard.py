@@ -89,6 +89,40 @@ TOPNAV_CSS = r"""
   .dg-top-brand-badge{width:34px;height:34px;flex-basis:34px}
   .st-key-dg_nav_control button{min-width:auto!important;font-size:.79rem!important;padding:.36rem .42rem!important}
 }
+
+/* DIENGIN Web 2.0: Figma/Vercel-inspired layout, scoped to existing live Streamlit data */
+.stApp{background:#F5FAF9!important}
+.block-container{max-width:1480px!important;padding-top:1.2rem!important}
+.st-key-dg_topbar{top:0!important;z-index:1001!important;margin:0 0 1.7rem!important}
+.st-key-dg_topbar > div{background:rgba(255,255,255,.96)!important;border:1px solid #E3EFEC!important;border-radius:0 0 19px 19px!important;box-shadow:0 9px 26px rgba(18,49,60,.07)!important}
+.dg-top-brand-badge{background:transparent!important;box-shadow:none!important;color:#137F85!important;font-size:27px!important}
+.dg-top-brand{font-size:1.45rem!important;letter-spacing:.035em!important}
+.st-key-dg_nav_control button{border-radius:14px!important}
+.dg-hero.figma-web2{display:grid!important;grid-template-columns:minmax(0,1.45fr) minmax(310px,1fr)!important;gap:0!important;border-radius:30px!important;overflow:hidden!important;background:#12313C!important;color:#F4FFFF!important;box-shadow:0 16px 35px rgba(18,49,60,.12)!important}
+.dg-hero.figma-web2 .dg-web2-left{min-width:0;padding:clamp(1.5rem,3.2vw,3.2rem)!important}
+.dg-hero.figma-web2 .dg-hero-kicker{color:#9BDEDC!important;font-weight:750!important;letter-spacing:.1em}
+.dg-hero.figma-web2 h1{color:#FFFFFF!important;font-size:clamp(1.6rem,2.55vw,2.8rem)!important;line-height:1.19!important;margin:.75rem 0!important}
+.dg-hero.figma-web2 p{color:#C9DFE1!important;font-size:1rem!important;max-width:700px}
+.dg-web2-prob-row{display:flex;align-items:baseline;gap:1rem;margin:1.2rem 0 .3rem}
+.dg-web2-prob{color:#fff;font:800 clamp(4.5rem,8vw,7.8rem)/1 'Plus Jakarta Sans',sans-serif;letter-spacing:-.075em}
+.dg-web2-model-status{font-size:.95rem;color:#9EDFD8}
+.dg-web2-track{height:11px;background:#3B6570;border-radius:20px;overflow:hidden;margin:.95rem 0 .5rem}
+.dg-web2-fill{height:100%;background:#74D5CD;border-radius:20px}
+.dg-web2-meta{display:flex;gap:1rem;flex-wrap:wrap;font-size:.84rem;color:#B5D4D6}
+.dg-web2-right{background:linear-gradient(180deg,#E8F7F4,#D7EBE9);padding:1.5rem;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#12313C;min-width:0}
+.dg-web2-right .dg-scene{transform:scale(1.45);transform-origin:center center;margin:28px auto 37px}
+.dg-web2-right .dg-web2-scene-label{text-align:center;color:#56747A;font-size:.94rem;font-weight:650}
+.dg-web2-right .dg-web2-observation{text-align:center;border-top:1px solid #BEDBD9;padding-top:1rem;margin-top:1rem;width:100%;font-size:.87rem;color:#43676E}
+.dg-web2-right .dg-web2-observation strong{display:block;font-size:1.45rem;color:#12313C;margin:.2rem}
+.dg-heading{display:none!important}
+.dg-current-head{text-align:left!important;margin-bottom:1rem!important}
+.dg-current-head h2{font-size:1.8rem!important;letter-spacing:-.03em!important}
+.dg-current-head p{font-size:.88rem!important}
+.dg-weather-card.instrument{box-shadow:0 4px 20px rgba(18,49,60,.035)}
+.dg-weather-card.instrument .dg-weather-value{font-size:clamp(2.7rem,3.3vw,4rem)!important}
+.dg-prediction-instruments .dg-weather-card.instrument{min-height:190px!important}
+@media(max-width:860px){.dg-hero.figma-web2{grid-template-columns:1fr!important}.dg-web2-right .dg-scene{transform:scale(1.1);margin:12px auto 16px}.dg-web2-right{padding:1rem!important}.dg-heading{display:none!important}}
+@media(max-width:620px){.dg-web2-prob{font-size:4.75rem}.dg-hero.figma-web2 .dg-web2-left{padding:1.3rem!important}.dg-web2-right .dg-scene{transform:scale(.95);margin:0 auto 6px}.dg-weather-card.instrument .dg-weather-value{font-size:clamp(1.85rem,6.8vw,2.6rem)!important}}
 </style>
 """
 base.CSS += TOPNAV_CSS
@@ -244,17 +278,39 @@ def _render_hero(monitor, pred, rh, now):
     else:
         delta_text = f"↑ +{delta * 100:.0f} poin" if delta > 0 else f"↓ {abs(delta) * 100:.0f} poin"
 
+    phase, sky, orb = design.phase_at(now.hour + now.minute / 60)
+    progress = ((now.hour + now.minute / 60 - (18 if phase == "malam" else 6)) % 24) / 12
+    progress = min(1.0, max(0.0, progress))
+    orb_x = 12 + progress * 110
+    orb_y = 42 - math.sin(progress * math.pi) * 31
+    scene_class = "night" if phase == "malam" else ""
+    params = latest_obs.get("parameters") or {}
+    temp = _num(params.get("tt_air_avg"))
+    temp_text = "—" if temp is None else f"{temp:.1f} °C"
+    threshold = _num(pred.get("threshold_stacked"))
+    target = pred.get("target_night_date") or "—"
+    p_model = _num(latest_release.get("stacked_probability"))
+    model_text = "—" if p_model is None else f"{p_model*100:.2f}%"
+    threshold_text = "—" if threshold is None else f"{threshold*100:.2f}%"
+    progress_width = min(100, max(0, p_model*100)) if p_model is not None else 0
+    flag = "Di atas ambang model" if p_model is not None and threshold is not None and p_model >= threshold else "Di bawah ambang model" if p_model is not None and threshold is not None else "Status belum tersedia"
     st.markdown(
-        '<div class="dg-hero"><div>'
-        f'<div class="dg-hero-kicker">DIENG · {base.esc(update_text)} · {base.esc(freshness_text)}</div>'
-        f'<h1>{base.esc(headline)}</h1>'
+        '<section class="dg-hero figma-web2"><div class="dg-web2-left">'
+        f'<div class="dg-hero-kicker">DIENGIN / PREDIKSI FROST · {base.esc(update_text)}</div>'
+        '<h1>Potensi frost di Dataran Tinggi Dieng</h1>'
+        f'<div class="dg-web2-prob-row"><span class="dg-web2-prob">{base.esc(model_text)}</span></div>'
+        f'<div class="dg-web2-model-status">{base.esc(flag)} · Ambang model {base.esc(threshold_text)}</div>'
+        f'<div class="dg-web2-track"><div class="dg-web2-fill" style="width:{progress_width:.2f}%"></div></div>'
+        f'<div class="dg-web2-meta"><span>Target {base.esc(str(target))}</span><span>{base.esc(freshness_text)}</span><span>{base.esc(delta_text)}</span></div>'
         f'<p>{base.esc(hero_text)}</p>'
-        '<div class="dg-hero-copy-note">Prospek cuaca eksternal hanya menjadi konteks dan tidak mengubah probabilitas model DIENGIN.</div>'
-        '</div><div class="dg-hero-score">'
-        '<div class="label">Probabilitas saat ini</div>'
-        f'<div class="value">{base.esc(prob_text)}</div>'
-        f'<div class="sub">{base.esc(delta_text)}</div>'
-        '</div></div>',
+        '<div class="dg-hero-copy-note">Probabilitas model bukan konfirmasi frost dan bukan peringatan resmi BMKG.</div>'
+        '</div><div class="dg-web2-right">'
+        f'<div class="dg-scene {scene_class}" role="img" aria-label="Ilustrasi suasana {base.esc(phase)}" style="--sky:{sky};--orb:{orb};--orb-x:{orb_x:.0f}px;--orb-y:{orb_y:.0f}px">'
+        '<div class="sky"><div class="orb"></div></div><div class="mountain"></div><div class="mountain front"></div><div class="ground"></div><div class="cloud"></div></div>'
+        f'<div class="dg-web2-scene-label">Suasana {base.esc(phase)} · ilustrasi WIB</div>'
+        '<div class="dg-web2-observation">Suhu AWS Batur terbaru'
+        f'<strong>{base.esc(temp_text)}</strong>Observasi {base.esc(str(latest_obs.get("time_wib") or "—"))}</div>'
+        '</div></section>',
         unsafe_allow_html=True,
     )
     return fresh, result
@@ -293,7 +349,7 @@ def dashboard() -> None:
     release = pred.get("latest_release") or {}
     current_probability = _num(release.get("stacked_probability"))
     threshold = _num(pred.get("threshold_stacked"))
-    design.render_live_heading(weather, frost=(current_probability is not None and threshold is not None and current_probability >= threshold))
+    # Illustration is now integrated in the prediction hero; avoid a duplicate header.
 
     if page == "Prediksi Frost":
         fresh, result = _render_hero(monitor, pred, rh, now)
