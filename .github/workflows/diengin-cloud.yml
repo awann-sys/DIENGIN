@@ -105,6 +105,7 @@ jobs:
           # Include the dashboard's local imports so runtime remains runnable.
           cp app_base.py app_ui.py centered_dashboard.py dashboard_features.py \
             nav_dashboard.py theme_controller.py ews_narrative.py expressive_dashboard.py \
+            web2_visuals.py \
             /tmp/diengin-runtime/
           mkdir -p /tmp/diengin-runtime/.streamlit
           cp .streamlit/config.toml /tmp/diengin-runtime/.streamlit/
