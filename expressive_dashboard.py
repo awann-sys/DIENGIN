@@ -176,7 +176,7 @@ def hourly_chart(series: pd.DataFrame, key: str, unit: str, label: str) -> str:
 def render_journey(mh, rh, pred, *, include_models=True):
     options = (list(features.MODEL_VARS) if include_models else []) + list(features.WEATHER_VARS)
     with st.container(key="dg_journey"):
-        st.markdown('### Perjalanan prediksi')
+        st.markdown('### Perjalanan Prediksi Model' if include_models else '### Tren Parameter AWS')
         widget_key = "dg_journey_parameter" if include_models else "dg_monitor_parameter"
         default_index = None if widget_key in st.session_state else (3 if include_models else 0)
         label = st.selectbox("Parameter grafik", options, index=default_index, key=widget_key)
@@ -191,7 +191,7 @@ def render_journey(mh, rh, pred, *, include_models=True):
                 frame, selected = features._series_frame(mh, same_night, [label])
         if not frame.empty and selected:
             key, unit = selected[label]
-            series = hourly_series(frame, key).tail(13)
+            series = hourly_series(frame, key).tail(25 if not include_models else 13)
             st.markdown(hourly_chart(series, key, unit, label), unsafe_allow_html=True)
             if not series.empty:
                 st.caption(f"{series.index.min():%d %b %Y} – {series.index.max():%d %b %Y} · WIB · {unit}")
