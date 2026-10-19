@@ -155,6 +155,19 @@ def archive_monitoring():
     payload = json.loads(MONITORING_LATEST.read_text(encoding="utf-8"))
     incoming = flatten_monitoring(payload)
 
+    # Preserve all downloaded observations, not just the newest snapshot.
+    source = PROJECT_ROOT / 'data' / 'processed' / 'aws_dieng_latest.csv'
+    if source.is_file():
+        observations = pd.read_csv(source)
+        if 'datetime_wib' in observations:
+            observations = observations.rename(columns={'datetime_wib': 'observation_time_wib'})
+            observations = observations.dropna(subset=['observation_time_wib'])
+            observations['observation_time_wib'] = pd.to_datetime(observations['observation_time_wib'], utc=True).dt.tz_convert(WIB).map(lambda value: value.isoformat())
+            for column in list(observations.columns):
+                if column.endswith('_flag') and column[:-5] in observations:
+                    observations.loc[pd.to_numeric(observations[column], errors='coerce').eq(1), column[:-5]] = float('nan')
+            incoming = pd.concat([observations, incoming], ignore_index=True, sort=False)
+
     if incoming.empty:
         return {"status": "skipped", "reason": "monitoring_latest tidak valid"}
 
@@ -260,3 +273,4 @@ def main():
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

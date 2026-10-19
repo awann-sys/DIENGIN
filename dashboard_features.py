@@ -516,6 +516,31 @@ def fetch_aws_history(start_wib_iso: str, end_wib_iso: str) -> pd.DataFrame:
     return df.dropna(subset=["_time"]).sort_values("_time").drop_duplicates("_time", keep="last").reset_index(drop=True)
 
 
+def render_interactive_chart(series, key, unit, label):
+    import altair as alt
+    if series.empty or key not in series or series[key].dropna().empty:
+        st.info('Belum ada data valid pada rentang ini.')
+        return
+    data = series[[key]].copy()
+    # Plot wall-clock WIB on a UTC scale so browser timezone cannot shift labels.
+    local = pd.DatetimeIndex(data.index)
+    if local.tz is not None:
+        local = local.tz_convert(WIB).tz_localize(None)
+    data['wib'] = local.tz_localize('UTC').as_unit('ms').asi8
+    data['Waktu WIB'] = local.strftime('%d/%m/%Y %H:%M')
+    gap = pd.Series(local, index=data.index).diff().gt(pd.Timedelta(hours=1))
+    data['segment'] = (data[key].isna() | gap).cumsum()
+    data = data.dropna(subset=[key]).reset_index(drop=True)
+    base = alt.Chart(data).encode(
+        x=alt.X('wib:T', title='Waktu (WIB)', scale=alt.Scale(type='utc'), axis=alt.Axis(format='%d/%m %H:%M', labelOverlap=True)),
+        y=alt.Y(f'{key}:Q', title=f'{label} ({unit})', scale=alt.Scale(zero=False)),
+        tooltip=[alt.Tooltip('Waktu WIB:N'), alt.Tooltip(f'{key}:Q', title=f'{label} ({unit})', format='.2f')],
+    )
+    chart = base.mark_line(color='#48BDB4', strokeWidth=2.5).encode(detail='segment:N') + base.mark_circle(color='#48BDB4', size=35)
+    st.altair_chart(chart.properties(height=330).interactive(), use_container_width=True)
+    st.caption('Arahkan ke titik untuk detail. Gulir untuk zoom; geser untuk menjelajah. Jam tanpa data tetap menjadi jeda.')
+
+
 def render_on_demand_monitoring_explorer() -> None:
     st.subheader("Eksplorasi Data AWS")
     st.caption("Pilih rentang tanggal dan jam. Data baru diminta dari AWS BMKG setelah tombol Muat Data ditekan.")
@@ -535,19 +560,29 @@ def render_on_demand_monitoring_explorer() -> None:
             with st.spinner("Mengunduh data AWS BMKG…"):
                 st.session_state["aws_requested_history"] = fetch_aws_history(start.isoformat(), end.isoformat())
             st.session_state["aws_requested_range"] = (start, end)
-        except (ValueError, RuntimeError, urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, json.JSONDecodeError) as exc:
-            st.error(f"Data belum dapat dimuat: {exc}")
+        except (ValueError, RuntimeError, urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, json.JSONDecodeError):
+            st.session_state.pop('aws_requested_history', None)
+            st.error('Data belum dapat dimuat. Periksa rentang (maksimal 31 hari), ketersediaan arsip, serta kredensial AWS BMKG pada deployment.')
     frame = st.session_state.get("aws_requested_history")
     if isinstance(frame, pd.DataFrame):
         if frame.empty:
             st.info("Request berhasil, tetapi tidak ada observasi pada rentang tersebut.")
             return
         st.success(f"{len(frame):,} observasi berhasil dimuat.")
+        loaded_start, loaded_end = st.session_state['aws_requested_range']
+        st.caption(f'Rentang yang dimuat: {loaded_start:%d/%m/%Y %H:%M} – {loaded_end:%d/%m/%Y %H:%M} WIB. Ubah tanggal lalu tekan Muat Data untuk memperbarui hasil.')
+        selected_label = st.selectbox('Parameter data unduhan', list(WEATHER_VARS), key='aws_download_parameter')
+        field, unit = WEATHER_VARS[selected_label]
+        if field in frame:
+            render_interactive_chart(frame.set_index('_time')[[field]], field, unit, selected_label)
+        with st.expander('Tampilkan observasi yang diunduh'):
+            st.dataframe(frame, hide_index=True, use_container_width=True)
         st.download_button(
             "↓ Unduh data AWS (CSV)",
             data=frame.to_csv(index=False).encode("utf-8"),
-            file_name="diengin_aws_requested.csv",
+            file_name=f"diengin_aws_{loaded_start:%Y%m%d_%H%M}_{loaded_end:%Y%m%d_%H%M}.csv",
             mime="text/csv",
             key="aws_req_download",
         )
         render_custom_explorer(frame, None, key_prefix="monitor_requested", include_models=False, default_labels=["Suhu udara", "Kelembapan relatif"], allow_download=True)
+

@@ -193,8 +193,26 @@ def render_journey(mh, rh, pred, *, include_models=True):
                 frame, selected = features._series_frame(mh, same_night, [label])
         if not frame.empty and selected:
             key, unit = selected[label]
-            series = hourly_series(frame, key).tail(25 if not include_models else 13)
-            st.markdown(hourly_chart(series, key, unit, label), unsafe_allow_html=True)
+            date_col1, date_col2 = st.columns(2)
+            first, last = frame['time'].min().date(), frame['time'].max().date()
+            prefix = 'prediction' if include_models else 'monitoring'
+            with date_col1:
+                start = st.date_input('Dari tanggal (WIB)', value=first, key=f'{prefix}_chart_start')
+            with date_col2:
+                end = st.date_input('Sampai tanggal (WIB)', value=last, key=f'{prefix}_chart_end')
+            if end < start:
+                st.warning('Tanggal akhir harus sama dengan atau setelah tanggal awal.')
+                return
+            frame = frame[(frame['time'].dt.date >= start) & (frame['time'].dt.date <= end)]
+            if frame.empty:
+                st.info('Tidak ada observasi pada rentang ini.')
+                return
+            series = hourly_series(frame, key)
+            features.render_interactive_chart(series, key, unit, label)
+            export = frame[['time', key]].rename(columns={'time': 'waktu_wib'})
+            st.download_button('Unduh data sesuai filter (CSV)', export.to_csv(index=False).encode('utf-8-sig'), file_name=f'diengin_{key}_{start}_{end}.csv', mime='text/csv', key=f'{prefix}_chart_download')
+            with st.expander('Tampilkan data sesuai filter'):
+                st.dataframe(export, hide_index=True, use_container_width=True)
             if not series.empty:
                 st.caption(f"{series.index.min():%d %b %Y} – {series.index.max():%d %b %Y} · WIB · {unit}")
             st.caption("Titik setiap 1 jam · nilai valid terakhir dalam jam yang berakhir pada label waktu · jam kosong menjadi jeda. Observasi terbaru tetap tersedia di kartu cuaca.")
