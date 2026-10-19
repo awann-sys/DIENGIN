@@ -538,7 +538,13 @@ def render_interactive_chart(series, key, unit, label):
         tooltip=[alt.Tooltip('Waktu WIB:N'), alt.Tooltip(f'{key}:Q', title=f'{label} ({unit})', format='.2f')],
     )
     chart = base.mark_line(color='#48BDB4', strokeWidth=2.5).encode(detail='segment:N') + base.mark_circle(color='#48BDB4', size=35)
-    st.altair_chart(chart.properties(height=330).interactive(), use_container_width=True)
+    from theme_controller import current_theme
+    dark = current_theme() == 'dark'
+    chart = chart.properties(height=330, background='transparent').interactive().configure_view(stroke=None).configure_axis(
+        labelColor='#B5C4D6' if dark else '#60757C', titleColor='#EDF4FF' if dark else '#172E37',
+        gridColor='#29394E' if dark else '#E5ECF5', domain=False, tickCount=6,
+    )
+    st.altair_chart(chart, use_container_width=True, theme=None)
     st.caption('Arahkan ke titik untuk detail. Gulir untuk zoom; geser untuk menjelajah. Jam tanpa data tetap menjadi jeda.')
 
 
