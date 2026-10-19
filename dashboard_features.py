@@ -555,7 +555,7 @@ def fetch_stored_aws_archive(start_iso, end_iso):
     if end <= start or end - start > pd.Timedelta(days=31):
         raise ValueError('Pilih rentang valid maksimum 31 hari.')
     frames = []
-    for month in pd.period_range(start.tz_localize(None).to_period('M'), end.tz_localize(None).to_period('M'), freq='M'):
+    for month in pd.period_range(start.tz_convert('UTC').tz_localize(None).to_period('M'), end.tz_convert('UTC').tz_localize(None).to_period('M'), freq='M'):
         url = f'https://raw.githubusercontent.com/awann-sys/DIENGIN/aws-archive/observations/{month}.csv.gz'
         try:
             with urllib.request.urlopen(url, timeout=30) as response:
@@ -577,7 +577,7 @@ def render_on_demand_monitoring_explorer() -> None:
     st.subheader("Eksplorasi Data AWS")
     st.caption("Pilih rentang tanggal dan jam. Data baru diminta dari AWS BMKG setelah tombol Muat Data ditekan.")
     source = st.selectbox('Sumber histori', ['Arsip tersimpan', 'Ambil langsung dari BMKG'], key='aws_history_source')
-    st.caption('Arsip sejak 2020 sedang diisi bertahap; tanggal tanpa hasil belum tentu berarti stasiun tidak merekam. Permintaan dibatasi 31 hari.')
+    st.caption('Arsip bulanan mulai 2021; hasil mengikuti ketersediaan rekaman BMKG. Permintaan dibatasi 31 hari.')
     now = pd.Timestamp.now(tz=WIB).floor("10min")
     default_start = now - pd.Timedelta(hours=12)
     c1, c2 = st.columns(2)

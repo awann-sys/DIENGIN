@@ -2,7 +2,7 @@ name: AWS historical archive
 on:
   push:
     branches: [main]
-    paths: [src/archive_aws.py, .github/workflows/aws-archive.yml]
+    paths: [src/archive_aws_monthly.py, .github/workflows/aws-archive.yml]
   workflow_dispatch:
   workflow_run:
     workflows: [DIENGIN Cloud Pipeline]
@@ -24,16 +24,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - run: python -m pip install pandas==2.2.3 requests==2.32.5
+      - run: python -m pip install pandas==2.2.3 requests==2.32.5 openpyxl==3.1.5
       - uses: actions/checkout@v4
         with:
           ref: aws-archive
           path: archive
-      - name: Download recent data and resume backfill
-        env:
-          AWS_API_USERNAME: ${{ secrets.AWS_API_USERNAME }}
-          AWS_API_PASSWORD: ${{ secrets.AWS_API_PASSWORD }}
-        run: python -m src.archive_aws --root archive --days 30
+      - name: Download monthly Excel exports from 2021 and refresh current month
+        run: python -m src.archive_aws_monthly --root archive --months 72
       - name: Save archive and checkpoints even after partial failure
         if: always()
         run: |
@@ -42,6 +39,9 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add observations/ archive_manifest.json 2>/dev/null || true
+          for item in raw aws_dieng_merged.csv.gz aws_dieng.sqlite.gz; do
+            if [ -e "$item" ]; then git add "$item"; fi
+          done
           if ! git diff --cached --quiet; then
             git commit -m 'Update AWS monthly archive and historical progress'
             git push origin HEAD:aws-archive
