@@ -18,6 +18,7 @@ import centered_dashboard as ui
 import dashboard_features as features
 import theme_controller as theme
 import expressive_dashboard as design
+import web2_visuals as web2
 from ews_narrative import build_ews_narrative
 
 base = app.base
@@ -116,8 +117,8 @@ def _top_nav() -> str:
         with brand_col:
             st.markdown(
                 '<div class="dg-top-brand">'
-                '<span class="dg-top-brand-badge">❄</span>'
-                '<span>DIENGIN</span>'
+                '<span class="dg-top-brand-badge">✳</span>'
+                '<span class="dg-web2-brandcopy">DIENGIN<small>FROST EARLY WARNING</small></span>'
                 '</div>',
                 unsafe_allow_html=True,
             )
@@ -244,19 +245,11 @@ def _render_hero(monitor, pred, rh, now):
     else:
         delta_text = f"↑ +{delta * 100:.0f} poin" if delta > 0 else f"↓ {abs(delta) * 100:.0f} poin"
 
-    st.markdown(
-        '<div class="dg-hero"><div>'
-        f'<div class="dg-hero-kicker">DIENG · {base.esc(update_text)} · {base.esc(freshness_text)}</div>'
-        f'<h1>{base.esc(headline)}</h1>'
-        f'<p>{base.esc(hero_text)}</p>'
-        '<div class="dg-hero-copy-note">Prospek cuaca eksternal hanya menjadi konteks dan tidak mengubah probabilitas model DIENGIN.</div>'
-        '</div><div class="dg-hero-score">'
-        '<div class="label">Probabilitas saat ini</div>'
-        f'<div class="value">{base.esc(prob_text)}</div>'
-        f'<div class="sub">{base.esc(delta_text)}</div>'
-        '</div></div>',
-        unsafe_allow_html=True,
-    )
+    weather_points = _future_bmkg_points(bmkg_payload, now)
+    weather = str(weather_points[0][1].get("weather_desc") or "") if weather_points else ""
+    # Render prediction probability and the original time-sensitive mountain scene
+    # together in the single Web 2.0 hero component.
+    web2.render_live_hero(pred, monitor, result, weather)
     return fresh, result
 
 
@@ -280,20 +273,19 @@ def dashboard() -> None:
     st.markdown(ui.FRAMER_CSS + TOPNAV_CSS, unsafe_allow_html=True)
     theme.apply_theme()
     st.markdown(design.CSS, unsafe_allow_html=True)
+    st.markdown(web2.CSS, unsafe_allow_html=True)
     now = pd.Timestamp.now(tz=base.WIB)
     monitor, pred, pipeline, mh, rh, nights, statuses = _load_data()
     page = _top_nav()
-    # Weather is forecast context; the illustration never asserts observed frost.
-    try:
-        payload, _ = app.get_bmkg_forecast()
-        points = _future_bmkg_points(payload, now)
-        weather = str(points[0][1].get("weather_desc") or "") if points else ""
-    except Exception:
-        weather = ""
-    release = pred.get("latest_release") or {}
-    current_probability = _num(release.get("stacked_probability"))
-    threshold = _num(pred.get("threshold_stacked"))
-    design.render_live_heading(weather, frost=(current_probability is not None and threshold is not None and current_probability >= threshold))
+    # Dedicated Web 2.0 heading for each page; the live scene is inside hero.
+    if page == "Prediksi Frost":
+        web2.render_page_intro("Prediksi Frost", "Pantau potensi frost dan kondisi meteorologi terbaru di Dataran Tinggi Dieng.")
+    elif page == "Monitoring AWS":
+        web2.render_page_intro("Monitoring AWS", "Pantau parameter cuaca AWS Batur serta grafik observasi per jam.")
+    elif page == "Tren & Historis":
+        web2.render_page_intro("Tren & Historis", "Jelajahi perkembangan probabilitas model dan kondisi meteorologi terdokumentasi.")
+    else:
+        web2.render_page_intro("Tentang DIENGIN", "Mengenal cara kerja, data, dan batasan sistem kewaspadaan frost.")
 
     if page == "Prediksi Frost":
         fresh, result = _render_hero(monitor, pred, rh, now)
