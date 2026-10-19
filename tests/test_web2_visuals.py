@@ -1,5 +1,7 @@
 """Regression checks for the Web 2.0 frost dashboard presentation."""
 import unittest
+import ast
+from pathlib import Path
 
 import pandas as pd
 
@@ -46,6 +48,20 @@ class TestWeb2Presentation(unittest.TestCase):
         markup = ui.hero_markup({"target_night_date": "<script>alert(1)</script>"}, {}, {}, "", self.now)
         self.assertNotIn("<script>", markup)
         self.assertIn("&lt;script&gt;", markup)
+
+    def test_navigation_default_is_a_valid_option(self):
+        source = Path("nav_dashboard.py").read_text(encoding="utf-8")
+        module = ast.parse(source)
+        nav = next(n for n in module.body if isinstance(n, ast.FunctionDef) and n.name == "_top_nav")
+        options = None
+        default = None
+        for node in ast.walk(nav):
+            if isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "options" for t in node.targets):
+                options = ast.literal_eval(node.value)
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "segmented_control":
+                default = next((ast.literal_eval(kw.value) for kw in node.keywords if kw.arg == "default"), None)
+        self.assertIsNotNone(options)
+        self.assertIn(default, options)
 
     def test_sticky_header_and_grid_present(self):
         self.assertIn("position:sticky", ui.CSS)
