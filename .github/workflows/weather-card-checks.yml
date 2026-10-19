@@ -3,6 +3,9 @@ on:
   pull_request:
     paths:
       - nav_dashboard.py
+      - web2_visuals.py
+      - expressive_dashboard.py
+      - tests/test_web2_visuals.py
       - dashboard_features.py
       - tests/test_weather_instrument_cards.py
       - .github/workflows/weather-card-checks.yml
@@ -18,6 +21,6 @@ jobs:
       - name: Install dashboard dependencies
         run: pip install streamlit pandas
       - name: Compile Python files
-        run: python -m py_compile dashboard_features.py nav_dashboard.py expressive_dashboard.py
+        run: python -m py_compile dashboard_features.py nav_dashboard.py expressive_dashboard.py web2_visuals.py
       - name: Test weather instruments
-        run: python -m unittest discover -s tests -p 'test_weather_instrument_cards.py' -v
+        run: python -m unittest discover -s tests -p 'test_*visuals.py' -v && python -m unittest discover -s tests -p 'test_weather_instrument_cards.py' -v
