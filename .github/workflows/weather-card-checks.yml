@@ -2,6 +2,7 @@ name: Weather Cards UI Checks
 on:
   pull_request:
     paths:
+      - nav_dashboard.py
       - dashboard_features.py
       - tests/test_weather_instrument_cards.py
       - .github/workflows/weather-card-checks.yml
