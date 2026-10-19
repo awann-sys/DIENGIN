@@ -81,6 +81,24 @@ CARD_CSS = r"""
  .dg-secondary-grid .dg-weather-card:last-child{grid-column:1/-1}.dg-all-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
  .dg-current-head h2{font-size:1.65rem}.dg-weather-card.primary .dg-weather-value{font-size:2.55rem}
 }
+
+/* DIENGIN Weather Instruments v2 — scoped to current cards only */
+.dg-all-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1.1rem}
+.dg-all-grid .dg-weather-card{min-height:190px}
+.dg-weather-card.instrument{position:relative;display:flex;flex-direction:column;text-align:left;justify-content:space-between;gap:1.25rem;padding:1.35rem 1.5rem;border:1px solid var(--dg-border);background:linear-gradient(135deg,var(--accent-bg),var(--dg-card,#fff) 75%);border-radius:22px}
+.dg-instrument-top{display:flex;align-items:center;justify-content:space-between;gap:.5rem}
+.dg-instrument-icon{color:var(--accent);font-size:1.75rem;line-height:1}
+.dg-weather-card.instrument .dg-weather-label{font-size:1.12rem;line-height:1.25;text-align:left}
+.dg-instrument-reading{display:flex;align-items:baseline;gap:.42rem;min-width:0;white-space:nowrap}
+.dg-weather-card.instrument .dg-weather-value{font-size:clamp(2.65rem,3.2vw,4rem);margin:0;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-.055em}
+.dg-instrument-unit{font-size:clamp(.86rem,1.2vw,1.3rem);font-weight:700;color:var(--dg-muted)}
+.dg-instrument-foot{display:flex;align-items:center;justify-content:space-between;gap:.5rem;padding-top:.75rem;border-top:1px solid var(--dg-border)}
+.dg-weather-card.instrument .dg-weather-note{font-size:.85rem;line-height:1.4;text-align:left}
+.dg-instrument-source{font-size:.76rem;color:var(--dg-muted);white-space:nowrap}
+.dg-current-wrap .dg-all-grid{margin-top:1.2rem}
+@media(max-width:1050px){.dg-all-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:620px){.dg-all-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem}.dg-weather-card.instrument{padding:.9rem;min-height:155px;gap:.75rem}.dg-weather-card.instrument .dg-weather-label{font-size:.86rem}.dg-weather-card.instrument .dg-weather-value{font-size:clamp(1.65rem,7.3vw,2.5rem)}.dg-instrument-unit{font-size:.72rem}.dg-instrument-foot{align-items:flex-start;flex-direction:column}.dg-instrument-source{display:none}}
+@media(max-width:380px){.dg-all-grid{grid-template-columns:1fr}.dg-weather-card.instrument .dg-weather-value{font-size:3.1rem}}
 </style>
 """
 
@@ -178,6 +196,39 @@ def render_prediction_weather(monitor: dict, history: pd.DataFrame | None, now: 
     st.markdown(html_block, unsafe_allow_html=True)
 
 
+
+INSTRUMENT_STYLES = {
+    "tt_air_avg": ("🌡", "#C36C46", "#FFF3ED"),
+    "tt_air_min": ("❄", "#4B90B4", "#EDF7FC"),
+    "rh_avg": ("💧", "#337FC3", "#EEF7FF"),
+    "ws_avg": ("≋", "#218B7E", "#EAF8F2"),
+    "wd_avg": ("↗", "#6785B0", "#F0F3FA"),
+    "rr": ("☂", "#478BC0", "#EFF7FE"),
+    "pp_air": ("◉", "#836CC0", "#F4F0FC"),
+    "dew_point_c": ("◇", "#478F91", "#EDF8F7"),
+    "tt_air_max": ("☀", "#CA8544", "#FFF6ED"),
+    "ws_max": ("≋", "#218B7E", "#EAF8F2"),
+    "sr_avg": ("☀", "#B78B32", "#FFF9EA"),
+    "sr_max": ("☀", "#B78B32", "#FFF9EA"),
+}
+
+
+def _instrument_card(label: str, value: Any, unit: str, note: str, key: str) -> str:
+    icon, accent, bg = INSTRUMENT_STYLES[key]
+    observed = _num(value)
+    number = _fmt(value, 2 if key in {"tt_air_avg", "tt_air_min", "tt_air_max", "ws_avg", "ws_max", "dew_point_c", "pp_air"} else 1)
+    value_text = number if observed is not None else "—"
+    unit_text = html.escape(unit) if observed is not None else ""
+    return (
+        f'<div class="dg-weather-card instrument" style="--accent:{accent};--accent-bg:{bg}">'
+        f'<div class="dg-instrument-top"><span class="dg-weather-label">{html.escape(label)}</span>'
+        f'<span class="dg-instrument-icon" aria-hidden="true">{icon}</span></div>'
+        f'<div class="dg-instrument-reading"><span class="dg-weather-value">{html.escape(value_text)}</span>'
+        f'<span class="dg-instrument-unit">{unit_text}</span></div>'
+        f'<div class="dg-instrument-foot"><span class="dg-weather-note">{html.escape(note)}</span>'
+        '<span class="dg-instrument-source">AWS Batur</span></div></div>'
+    )
+
 def render_monitoring_cards(monitor: dict) -> None:
     st.markdown(CARD_CSS, unsafe_allow_html=True)
     latest = monitor.get("latest_observation") or {}
@@ -202,7 +253,7 @@ def render_monitoring_cards(monitor: dict) -> None:
     st.markdown(
         '<section class="dg-current-wrap"><div class="dg-current-head"><h2>Monitoring AWS</h2>'
         f'<p>{html.escape(str(station))} · observasi {html.escape(str(obs_time))}</p></div>'
-        '<div class="dg-all-grid">' + ''.join(_card(*item) for item in values) + '</div></section>',
+        '<div class="dg-all-grid">' + ''.join(_instrument_card(*item, key) for item, key in zip(values, ["tt_air_avg", "tt_air_min", "rh_avg", "ws_avg", "wd_avg", "rr", "pp_air", "dew_point_c", "tt_air_max", "ws_max", "sr_avg", "sr_max"])) + '</div></section>',
         unsafe_allow_html=True,
     )
 
