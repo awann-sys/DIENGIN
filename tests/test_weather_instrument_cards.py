@@ -7,6 +7,13 @@ class TestWeatherInstruments(unittest.TestCase):
     def test_all_twelve_instrument_styles(self):
         self.assertEqual(len(d.INSTRUMENT_STYLES), 12)
 
+    def test_observation_time_is_formatted_as_wib(self):
+        self.assertEqual(
+            d._observation_label("2026-10-19T08:40:00+07:00"),
+            "19 Okt 2026, 08.40 WIB",
+        )
+        self.assertEqual(d._observation_label(None), "waktu tidak tersedia")
+
     def test_unit_next_to_number(self):
         card = d._instrument_card("Suhu udara", 19.74, "°C", "Naik", "tt_air_avg")
         self.assertIn('dg-instrument-reading', card)
