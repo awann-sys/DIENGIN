@@ -513,6 +513,7 @@ def fetch_aws_history(start_wib_iso: str, end_wib_iso: str) -> pd.DataFrame:
             df[col] = pd.NA
         df[col] = pd.to_numeric(df[col], errors="coerce")
     df["dew_point_c"] = [_dew_point(t, r) for t,r in zip(df["tt_air_avg"], df["rh_avg"])]
+    df = df[df['_time'].between(start_wib, end_wib)]
     return df.dropna(subset=["_time"]).sort_values("_time").drop_duplicates("_time", keep="last").reset_index(drop=True)
 
 
@@ -533,7 +534,7 @@ def render_interactive_chart(series, key, unit, label):
     data = data.dropna(subset=[key]).reset_index(drop=True)
     base = alt.Chart(data).encode(
         x=alt.X('wib:T', title='Waktu (WIB)', scale=alt.Scale(type='utc'), axis=alt.Axis(format='%d/%m %H:%M', labelOverlap=True)),
-        y=alt.Y(f'{key}:Q', title=f'{label} ({unit})', scale=alt.Scale(zero=False)),
+        y=alt.Y(f'{key}:Q', title=f'{label} ({unit})', scale=alt.Scale(domain=[0, 100]) if 'Probabilitas' in label else alt.Scale(zero=False)),
         tooltip=[alt.Tooltip('Waktu WIB:N'), alt.Tooltip(f'{key}:Q', title=f'{label} ({unit})', format='.2f')],
     )
     chart = base.mark_line(color='#48BDB4', strokeWidth=2.5).encode(detail='segment:N') + base.mark_circle(color='#48BDB4', size=35)
