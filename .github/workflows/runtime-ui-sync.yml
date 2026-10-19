@@ -1,0 +1,52 @@
+name: Sync DIENGIN Web 2.0 UI to runtime
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - nav_dashboard.py
+      - dashboard_features.py
+      - expressive_dashboard.py
+      - web2_visuals.py
+      - .github/workflows/runtime-ui-sync.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Share a lock with the operational pipeline's force-push snapshot.
+concurrency:
+  group: diengin-cloud-pipeline
+  cancel-in-progress: false
+
+jobs:
+  sync-ui:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out production UI
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+      - name: Preserve checked-out UI modules
+        run: |
+          mkdir -p "$RUNNER_TEMP/diengin-ui"
+          cp nav_dashboard.py dashboard_features.py expressive_dashboard.py web2_visuals.py "$RUNNER_TEMP/diengin-ui/"
+          python -m py_compile nav_dashboard.py dashboard_features.py expressive_dashboard.py web2_visuals.py
+      - name: Update only UI code on the operational snapshot branch
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch origin +refs/heads/runtime:refs/remotes/origin/runtime
+          git checkout -B runtime-ui-sync origin/runtime
+          cp "$RUNNER_TEMP/diengin-ui/"*.py .
+          test -s output/monitoring_latest.json
+          test -s output/prediction_latest.json
+          git add nav_dashboard.py dashboard_features.py expressive_dashboard.py web2_visuals.py
+          if git diff --cached --quiet; then
+            echo 'UI already in sync'
+          else
+            git commit -m 'Sync production Web 2.0 interface into runtime snapshot'
+            git push origin HEAD:refs/heads/runtime
+          fi
