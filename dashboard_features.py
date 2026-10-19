@@ -522,14 +522,15 @@ def render_interactive_chart(series, key, unit, label):
     if series.empty or key not in series or series[key].dropna().empty:
         st.info('Belum ada data valid pada rentang ini.')
         return
-    data = series[[key]].copy()
+    daily_view = len(series) > 4000
+    data = series[[key]].resample('1D').last() if daily_view else series[[key]].copy()
     # Plot wall-clock WIB on a UTC scale so browser timezone cannot shift labels.
     local = pd.DatetimeIndex(data.index)
     if local.tz is not None:
         local = local.tz_convert(WIB).tz_localize(None)
     data['wib'] = local.tz_localize('UTC').as_unit('ms').asi8
     data['Waktu WIB'] = local.strftime('%d/%m/%Y %H:%M')
-    gap = pd.Series(local, index=data.index).diff().gt(pd.Timedelta(hours=1))
+    gap = pd.Series(local, index=data.index).diff().gt(pd.Timedelta(days=1) if daily_view else pd.Timedelta(hours=1))
     data['segment'] = (data[key].isna() | gap).cumsum()
     data = data.dropna(subset=[key]).reset_index(drop=True)
     base = alt.Chart(data).encode(
@@ -545,6 +546,8 @@ def render_interactive_chart(series, key, unit, label):
         gridColor='#29394E' if dark else '#E5ECF5', domain=False, tickCount=6,
     )
     st.altair_chart(chart, use_container_width=True, theme=None)
+    if daily_view:
+        st.caption('Rentang panjang: grafik menampilkan nilai valid terakhir tiap hari. Tabel dan unduhan tetap memuat seluruh observasi sesuai filter.')
     st.caption('Arahkan ke titik untuk detail. Gulir untuk zoom; geser untuk menjelajah. Jam tanpa data tetap menjadi jeda.')
 
 
@@ -552,13 +555,17 @@ def render_interactive_chart(series, key, unit, label):
 def fetch_stored_aws_archive(start_iso, end_iso):
     import gzip
     start, end = pd.Timestamp(start_iso), pd.Timestamp(end_iso)
-    if end <= start or end - start > pd.Timedelta(days=31):
-        raise ValueError('Pilih rentang valid maksimum 31 hari.')
+    if end <= start:
+        raise ValueError('Tanggal akhir harus setelah tanggal awal.')
     frames = []
-    for month in pd.period_range(start.tz_convert('UTC').tz_localize(None).to_period('M'), end.tz_convert('UTC').tz_localize(None).to_period('M'), freq='M'):
-        url = f'https://raw.githubusercontent.com/awann-sys/DIENGIN/aws-archive/observations/{month}.csv.gz'
+    if end - start > pd.Timedelta(days=31):
+        urls = ['https://raw.githubusercontent.com/awann-sys/DIENGIN/aws-archive/aws_dieng_merged.csv.gz']
+    else:
+        months = pd.period_range(start.tz_convert('UTC').tz_localize(None).to_period('M'), end.tz_convert('UTC').tz_localize(None).to_period('M'), freq='M')
+        urls = [f'https://raw.githubusercontent.com/awann-sys/DIENGIN/aws-archive/observations/{month}.csv.gz' for month in months]
+    for url in urls:
         try:
-            with urllib.request.urlopen(url, timeout=30) as response:
+            with urllib.request.urlopen(url, timeout=90) as response:
                 frames.append(pd.read_csv(io.BytesIO(gzip.decompress(response.read()))))
         except urllib.error.HTTPError as error:
             if error.code != 404:
@@ -577,7 +584,7 @@ def render_on_demand_monitoring_explorer() -> None:
     st.subheader("Eksplorasi Data AWS")
     st.caption("Pilih rentang tanggal dan jam. Data baru diminta dari AWS BMKG setelah tombol Muat Data ditekan.")
     source = st.selectbox('Sumber histori', ['Arsip tersimpan', 'Ambil langsung dari BMKG'], key='aws_history_source')
-    st.caption('Arsip bulanan mulai 2021; hasil mengikuti ketersediaan rekaman BMKG. Permintaan dibatasi 31 hari.')
+    st.caption('Arsip bulanan mulai 2021 mendukung rentang lintas bulan/tahun. Permintaan langsung ke BMKG pada menu ini dibatasi 31 hari.')
     now = pd.Timestamp.now(tz=WIB).floor("10min")
     default_start = now - pd.Timedelta(hours=12)
     c1, c2 = st.columns(2)
