@@ -27,7 +27,7 @@ TOPNAV_CSS = r"""
 .st-key-dg_topbar{
   margin:.15rem 0 1rem!important;
   position:sticky!important;
-  top:.5rem!important;
+  top:.2rem!important;
   z-index:999!important;
 }
 .st-key-dg_topbar > div{
@@ -65,15 +65,18 @@ TOPNAV_CSS = r"""
   background:transparent!important;border:0!important;padding:0!important;
 }
 .st-key-dg_nav_control button{
-  min-width:116px!important;min-height:38px!important;padding:.42rem .72rem!important;
+  min-width:105px!important;min-height:38px!important;padding:.42rem .72rem!important;
   border-radius:10px!important;font-family:"Plus Jakarta Sans",sans-serif!important;
-  font-size:.92rem!important;font-weight:720!important;
+  font-size:.83rem!important;font-weight:720!important;
 }
 .st-key-dg_theme_col{
   display:flex!important;justify-content:flex-end!important;align-items:center!important;
   min-height:40px!important;
 }
 .st-key-dg_theme_col > div{width:auto!important;margin-left:auto!important}
+.dg-top-brand{color:#137F85!important;font-size:1.25rem!important}
+.st-key-dg_topbar > div{background:rgba(255,255,255,.97)!important;border-radius:16px!important;box-shadow:0 8px 24px rgba(18,49,60,.08)!important}
+.st-key-dg_nav_control button[aria-pressed="true"]{background:#DFF3EF!important;color:#137F85!important}
 .dg-hero-copy-note{margin-top:.75rem;font-size:.78rem;opacity:.78}
 
 @media(max-width:980px){
@@ -115,7 +118,7 @@ def _top_nav() -> str:
             with st.container(key="dg_nav_control"):
                 page = st.segmented_control(
                     "Navigasi utama",
-                    ["Prediksi", "Prospek BMKG", "Monitoring"],
+                    ["Prediksi Frost", "Monitoring AWS", "Tren & Historis", "Tentang"],
                     default="Prediksi",
                     key="dg_primary_nav",
                     label_visibility="collapsed",
@@ -123,7 +126,7 @@ def _top_nav() -> str:
         with theme_col:
             with st.container(key="dg_theme_col"):
                 theme.render_toggle()
-    return page or "Prediksi"
+    return page or "Prediksi Frost"
 
 
 def _load_data():
@@ -285,7 +288,7 @@ def dashboard() -> None:
     threshold = _num(pred.get("threshold_stacked"))
     design.render_live_heading(weather, frost=(current_probability is not None and threshold is not None and current_probability >= threshold))
 
-    if page == "Prediksi":
+    if page == "Prediksi Frost":
         fresh, result = _render_hero(monitor, pred, rh, now)
         features.render_prediction_weather(monitor, mh, now)
         _render_notices(monitor, pipeline, statuses["monitoring"], fresh)
@@ -309,30 +312,46 @@ def dashboard() -> None:
                 allow_download=False,
             )
 
-    elif page == "Prospek BMKG":
-        ui._section(
-            "PROSPEK BMKG",
-            "Prakiraan cuaca Dieng",
-            "Prakiraan BMKG menjadi konteks prospek dan tidak mengubah probabilitas frost DIENGIN.",
-        )
-        app.render_bmkg_forecast(now)
+        with st.expander("Lihat juga prospek cuaca BMKG"):
+            app.render_bmkg_forecast(now)
 
-    else:
+    elif page == "Monitoring AWS":
         features.render_monitoring_cards(monitor)
         design.render_journey(mh, pd.DataFrame(), {}, include_models=False)
         latest_obs = monitor.get("latest_observation") or {}
         fresh, _, _ = base.freshness(latest_obs.get("time_wib"), now)
         _render_notices(monitor, pipeline, statuses["monitoring"], fresh)
-
         ui._section(
             "HISTORI AWS",
-            "Pilih sendiri periode yang ingin dilihat",
-            "Data historis baru diminta ketika tombol Muat Data ditekan. Setelah tersedia, data dapat digrafikkan dan diunduh.",
+            "Grafik dan data pengamatan",
+            "Grafik historis menggunakan observasi AWS. Data tambahan diminta saat tombol Muat Data ditekan.",
         )
         features.render_on_demand_monitoring_explorer()
 
-        with st.expander("Panduan & status sistem"):
-            base.render_info(monitor, pred, pipeline, statuses, now)
+    elif page == "Tren & Historis":
+        ui._section(
+            "TREN & HISTORIS",
+            "Perjalanan prediksi dan pengamatan Dieng",
+            "Lihat riwayat rilis probabilitas model serta perubahan meteorologi dari data yang tersedia.",
+        )
+        design.render_journey(mh, rh, pred)
+        features.render_custom_explorer(
+            mh, rh, key_prefix="history_explore", include_models=True,
+            default_labels=["Suhu udara", "Probabilitas Stacked / Final"],
+            allow_download=False,
+        )
+        features.render_on_demand_monitoring_explorer()
+
+    else:
+        ui._section(
+            "TENTANG DIENGIN",
+            "Sistem pendukung kewaspadaan frost",
+            "DIENGIN adalah prototipe penelitian. Probabilitas model bukan konfirmasi terjadinya frost ataupun peringatan resmi BMKG.",
+        )
+        st.info("Data pengamatan berasal dari AWS Batur Dieng. Prakiraan BMKG digunakan sebagai konteks, tidak mengubah hasil model.")
+        with st.expander("Prospek cuaca BMKG"):
+            app.render_bmkg_forecast(now)
+        base.render_info(monitor, pred, pipeline, statuses, now)
 
     st.markdown(
         '<div class="dg-footer">DIENGIN · Prototipe penelitian, bukan peringatan resmi BMKG. '
