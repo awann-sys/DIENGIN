@@ -78,6 +78,16 @@ CSS = r"""
 .dg-section-title{font-size:1.75rem!important;color:var(--web2-navy)!important}
 .dg-section-kicker{color:var(--web2-teal)!important}
 .dg-footer{color:var(--web2-muted)!important}
+/* Decorative stars live behind the content and never intercept input. */
+[data-testid="stMain"]:has(.dg-night-stars)::before{
+ content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+ background-image:radial-gradient(1px 1px at 12% 18%,#d8efff 95%,transparent),radial-gradient(1.5px 1.5px at 76% 32%,#bce7ff 95%,transparent),radial-gradient(1px 1px at 38% 68%,#fff 95%,transparent),radial-gradient(1px 1px at 88% 82%,#d8efff 95%,transparent),radial-gradient(1px 1px at 57% 9%,#fff 95%,transparent);
+ background-size:271px 317px,397px 281px,337px 419px,463px 353px,521px 467px;
+ animation:dgStarTwinkle 6s ease-in-out infinite alternate;
+}
+[data-testid="stMain"]:has(.dg-night-stars) .block-container{position:relative;z-index:1}
+@keyframes dgStarTwinkle{from{opacity:.18}to{opacity:.6}}
+@media(prefers-reduced-motion:reduce){[data-testid="stMain"]:has(.dg-night-stars)::before{animation:none;opacity:.35}}
 @media(max-width:1150px){.dg2-hero{grid-template-columns:minmax(0,1.3fr) minmax(260px,1fr)}.dg-prediction-instruments{grid-template-columns:repeat(2,minmax(0,1fr))!important}.dg-all-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
 @media(max-width:760px){
  .block-container{padding:1rem .8rem 2.5rem!important}
@@ -224,6 +234,9 @@ def render_live_hero(pred: dict, monitor: dict, result: dict, weather: str = "")
 
 
 def render_page_intro(title: str, subtitle: str, eyebrow: str = "DIENGIN · Frost Early Warning") -> None:
+    from theme_controller import current_theme
+    if current_theme() == "dark":
+        st.markdown('<span class="dg-night-stars" aria-hidden="true"></span>', unsafe_allow_html=True)
     st.markdown(
         '<div class="dg2-page-intro">'
         f'<div class="dg2-eyebrow">{_safe(eyebrow)}</div>'
