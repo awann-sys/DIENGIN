@@ -19,7 +19,7 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install dashboard dependencies
-        run: pip install streamlit pandas
+        run: python -m pip install --retries 8 --timeout 120 streamlit pandas
       - name: Compile Python files
         run: python -m py_compile dashboard_features.py nav_dashboard.py expressive_dashboard.py web2_visuals.py
       - name: Test weather instruments
