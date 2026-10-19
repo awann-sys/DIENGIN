@@ -103,6 +103,13 @@ def _num(value):
 
 
 def _top_nav() -> str:
+    # Migrate old navigation state after changing the labels in production.
+    options = ["Prediksi Frost", "Monitoring AWS", "Tren & Historis", "Tentang"]
+    previous = st.session_state.get("dg_primary_nav")
+    legacy = {"Prediksi": "Prediksi Frost", "Monitoring": "Monitoring AWS",
+              "Prospek BMKG": "Tentang"}
+    if previous is not None and previous not in options:
+        st.session_state["dg_primary_nav"] = legacy.get(previous, "Prediksi Frost")
     # Equal side columns keep the center navigation genuinely centered.
     with st.container(key="dg_topbar"):
         brand_col, nav_col, theme_col = st.columns([1.0, 1.75, 1.0], vertical_alignment="center")
@@ -118,8 +125,8 @@ def _top_nav() -> str:
             with st.container(key="dg_nav_control"):
                 page = st.segmented_control(
                     "Navigasi utama",
-                    ["Prediksi Frost", "Monitoring AWS", "Tren & Historis", "Tentang"],
-                    default="Prediksi",
+                    options,
+                    default="Prediksi Frost",
                     key="dg_primary_nav",
                     label_visibility="collapsed",
                 )
