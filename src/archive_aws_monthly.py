@@ -81,7 +81,15 @@ def run(root, limit=72):
     state.setdefault('months_checked', {})
     months = [(year, month) for year in range(2021, today.year + 1) for month in range(1, 13) if (year, month) <= (today.year, today.month)]
     # Refresh the current month every run, then continue pending historical months.
-    pending = [(y, m) for y, m in months if f'{y}-{m:02d}' not in state['months_checked'] or state['months_checked'][f'{y}-{m:02d}'].get('status') == 'error']
+    def needs_refresh(year, month):
+        entry = state['months_checked'].get(f'{year}-{month:02d}', {})
+        if entry.get('status') not in ('downloaded', 'empty'):
+            return True
+        if entry.get('status') == 'empty':
+            checked = datetime.fromisoformat(entry['checked_utc'])
+            return entry.get('url') != month_url(year, month, today) or (datetime.now(timezone.utc) - checked).days >= 7
+        return False
+    pending = [(y, m) for y, m in months if needs_refresh(y, m)]
     previous = today.replace(day=1) - timedelta(days=1)
     work = list(dict.fromkeys([(today.year, today.month), (previous.year, previous.month)] + pending))[:limit]
     failure = False

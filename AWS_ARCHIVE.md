@@ -9,6 +9,9 @@ yang membatasi rentang 24 jam. ID stasiun `STA2285`.
   atau tanggal hari ini untuk bulan berjalan. Tahun URL berubah otomatis.
 
 Branch `aws-archive` berisi:
+Branch ini menyimpan satu snapshot lengkap (seperti branch `runtime`), agar
+versi database besar tidak menumpuk pada setiap pembaruan. Seluruh Excel bulanan
+dan hasil data tetap ada di snapshot; riwayat commit bukan cadangan versinya.
 
 | Lokasi | Isi |
 | --- | --- |
@@ -35,6 +38,8 @@ mengulang bulan error/belum selesai. Bulan sekarang dan bulan sebelumnya
 diperbarui setiap run. Run dipicu sesudah pipeline operasional berhasil,
 disertai cron per jam sebagai cadangan. Bulan kosong dilaporkan sebagai `empty`,
 sedangkan kegagalan unduh/format sebagai `error` dan dicoba lagi.
+Bulan kosong diperiksa ulang setelah tujuh hari atau jika jalur tahun sumber
+berubah ketika pergantian tahun, sehingga kekosongan sementara dapat terisi.
 
 Di Streamlit: Monitoring AWS → Eksplorasi Data AWS → Sumber histori →
 Arsip tersimpan → pilih rentang WIB → Muat Data. Hasil filter dapat ditampilkan

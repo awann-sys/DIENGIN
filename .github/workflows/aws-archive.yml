@@ -38,12 +38,13 @@ jobs:
           cd archive
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add observations/ archive_manifest.json 2>/dev/null || true
-          for item in raw aws_dieng_merged.csv.gz aws_dieng.sqlite.gz; do
-            if [ -e "$item" ]; then git add "$item"; fi
-          done
-          if ! git diff --cached --quiet; then
-            git commit -m 'Update AWS monthly archive and historical progress'
-            git push origin HEAD:aws-archive
+          if [ -f archive_manifest.json ]; then
+            # Keep one complete snapshot, like runtime, rather than accumulating
+            # a new 10 MB database version after every operational update.
+            printf '/aws_dieng.sqlite\n' > .gitignore
+            git checkout --orphan archive-snapshot
+            git add -A
+            git commit -m 'Update complete AWS monthly archive snapshot'
+            git push --force-with-lease origin HEAD:aws-archive
           fi
 
