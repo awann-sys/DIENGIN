@@ -117,7 +117,7 @@ def _top_nav() -> str:
         with brand_col:
             st.markdown(
                 '<div class="dg-top-brand">'
-                '<span class="dg-top-brand-badge">✳</span>'
+                '<span class="dg-top-brand-badge" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M16 3v26M3 16h26M7 7l18 18M7 25L25 7"/></svg></span>'
                 '<span class="dg-web2-brandcopy">DIENGIN<small>FROST EARLY WARNING</small></span>'
                 '</div>',
                 unsafe_allow_html=True,
@@ -357,3 +357,4 @@ def dashboard() -> None:
         'Prakiraan eksternal hanya menjadi konteks. Seluruh waktu dalam WIB.</div>',
         unsafe_allow_html=True,
     )
+

@@ -67,10 +67,12 @@ CSS = """
 @media(max-width:380px){.dg-heading h1{font-size:1.35rem}.dg-scene{transform:scale(.6);flex-basis:105px;margin-left:-55px}.dg-scene-label{max-width:105px}.st-key-dg_nav_control button{font-size:.68rem!important;padding:.3rem!important}}
 @media(max-width:760px){.dg-heading>div:last-child{width:145px;flex:0 0 145px;overflow:hidden}.dg-scene{width:210px;height:126px;transform:scale(.68);transform-origin:top left;margin:0 0 -38px;flex:none}.dg-scene-label{max-width:145px;text-align:center}}
 @media(max-width:380px){.dg-heading>div:last-child{width:105px;flex-basis:105px}.dg-scene{transform:scale(.5);margin:0 0 -63px}.dg-scene-label{max-width:105px}.st-key-dg_theme_selector_wrap button{width:27px!important;min-width:27px!important;max-width:27px!important}}
-.st-key-dg_insight_0,.st-key-dg_insight_1,.st-key-dg_insight_2,.st-key-dg_insight_3{border:1px solid var(--dg-border);border-left:4px solid var(--accent);border-radius:16px;padding:12px 16px!important;background:var(--dg-card);margin-bottom:10px}
+.st-key-dg_insight_0,.st-key-dg_insight_1,.st-key-dg_insight_2,.st-key-dg_insight_3{border:1px solid var(--dg-border);border-left:4px solid var(--accent);border-radius:16px;padding:20px 22px!important;background:var(--dg-card);margin-bottom:12px;gap:8px!important;height:auto!important;box-sizing:border-box}
 .st-key-dg_insight_0{--accent:#ae7c30}.st-key-dg_insight_1{--accent:#437fba}.st-key-dg_insight_2{--accent:#16897c}.st-key-dg_insight_3{--accent:#8a6baa}
 [class*="st-key-dg_insight_"] button{border:0!important;padding:0!important;min-height:28px!important;justify-content:flex-start!important;background:transparent!important;color:var(--accent)!important;box-shadow:none!important}
-[class*="st-key-dg_insight_"] button p{font-weight:750;font-size:.94rem}[class*="st-key-dg_insight_"] .dg-insight-text{font-size:.84rem;color:var(--dg-muted);line-height:1.55;margin:0}
+[class*="st-key-dg_insight_"] button p{font-weight:750;font-size:.94rem;margin:0!important;line-height:1.4!important}[class*="st-key-dg_insight_"] .dg-insight-text{font-size:.84rem;color:var(--dg-muted);line-height:1.6;margin:0!important;padding:0!important}
+[class*="st-key-dg_insight_"] [data-testid="stElementContainer"]{height:auto!important;min-height:0!important;margin:0!important}
+[class*="st-key-dg_insight_"] [data-testid="stMarkdownContainer"]{padding:0!important;margin:0!important}
 .st-key-dg_lower h3{font-size:1.25rem!important;margin-bottom:12px!important}
 @media(max-width:760px){.st-key-dg_lower [data-testid="stHorizontalBlock"]{flex-direction:column!important}.st-key-dg_lower [data-testid="stColumn"]{width:100%!important;flex:1 1 100%!important}}
 </style>
@@ -222,3 +224,4 @@ def render_insights(monitor, pred, result):
         with st.container(key=f"dg_insight_{i}"):
             st.button(f"{icon}  {title}", key=f"dg_insight_button_{i}", on_click=_select_parameter, args=(labels[i],), help="Tampilkan parameter terkait pada grafik")
             st.markdown(f'<p class="dg-insight-text">{html.escape(text)}</p>', unsafe_allow_html=True)
+
