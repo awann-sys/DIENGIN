@@ -52,18 +52,38 @@ class TestWeb2Presentation(unittest.TestCase):
         markup = ui.hero_markup(pred, self.monitor, {'probability_now': threshold}, '', self.now)
         self.assertIn('80.0<span>/100</span>', markup)
         self.assertIn('width:80.00%', markup)
-        self.assertIn('Ambang peringatan tercapai', markup)
+        self.assertIn('● Siaga', markup)
+        self.assertIn('dg2-level-siaga', markup)
         self.assertIn('dg2-warning', markup)
         self.assertEqual(pred, self.pred)
         below = ui.hero_markup(pred, self.monitor, {'probability_now': threshold - .01}, '', self.now)
-        self.assertIn('Di bawah ambang model', below)
+        self.assertIn('● Waspada', below)
         self.assertNotIn('dg2-warning', below)
 
     def test_missing_values_remain_missing(self):
         markup = ui.hero_markup({}, {}, {}, "", self.now)
-        self.assertIn("Probabilitas belum tersedia", markup)
+        self.assertIn("Belum tersedia", markup)
+        self.assertIn('dg2-level-unavailable', markup)
+        self.assertNotIn('● Aman', markup)
         self.assertNotIn("nan", markup.lower())
         self.assertNotIn("100.00%", markup)
+
+    def test_three_level_boundaries_and_preventive_advice(self):
+        threshold = self.pred['threshold_stacked']
+        cases = [(0, 'aman'), (threshold / 2 - 1e-8, 'aman'),
+                 (threshold / 2, 'waspada'), (threshold - 1e-8, 'waspada'),
+                 (threshold, 'siaga'), (1, 'siaga')]
+        for probability, expected in cases:
+            level, name, advice = ui.warning_level(probability, threshold)
+            self.assertEqual(level, expected)
+            markup = ui.hero_markup(self.pred, self.monitor, {'probability_now': probability}, '', self.now)
+            self.assertIn('dg2-level-' + expected, markup)
+            self.assertIn('● ' + name, markup)
+            self.assertIn(advice, markup)
+            self.assertIn('Periksa waktu rilis', markup)
+        self.assertIn('background:#166534', ui.CSS)
+        self.assertIn('background:#fde047', ui.CSS)
+        self.assertIn('background:#b91c1c', ui.CSS)
 
     def test_scene_tracks_wib(self):
         morning = ui.scene_markup(pd.Timestamp("2026-10-19T06:30:00+07:00"))

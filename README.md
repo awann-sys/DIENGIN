@@ -46,3 +46,12 @@ probabilitas satu dipetakan ke 100, menggunakan interpolasi linear pada kedua
 interval. Angka skor bukan persentase peluang frost. Probabilitas asli dan
 ambang model tetap terlihat; grafik probabilitas, output model, dan keputusan
 peringatan tetap menggunakan probabilitas serta ambang asli.
+
+Level tampilan: Aman (hijau, skor <40), Waspada (kuning, 40 hingga <80),
+dan Siaga (merah, ≥80), masing-masing dengan saran preventif. Siaga mengikuti
+ambang probabilitas model; batas Waspada memakai separuh ambang tersebut
+sebagai pilihan komunikasi awal, bukan ambang ilmiah yang sudah divalidasi.
+Data hilang tidak diberi label Aman. Peringatan kualitas data tetap terlihat.
+Panduan penutup tanaman merujuk UF/IFAS Extension, “Time to Cover Up”:
+https://blogs.ifas.ufl.edu/hillsboroughco/2022/12/21/time-to-cover-up/
+Tindakan perlu disesuaikan dengan tanaman, kondisi lahan, dan arahan penyuluh.

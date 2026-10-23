@@ -47,8 +47,16 @@ CSS = r"""
 .dg2-risk-status{display:inline-flex;align-items:center;gap:.45rem;padding:.42rem .7rem;border:1px solid rgba(201,239,227,.23);border-radius:999px;background:rgba(255,255,255,.095);font-size:.8rem;font-weight:750}
 .dg2-meter{height:9px;width:100%;border-radius:20px;background:#45676c;margin:1.05rem 0 .5rem;overflow:hidden}
 .dg2-meter>span{display:block;height:100%;background:linear-gradient(90deg,#58bdba,#a7ebe0);border-radius:20px;min-width:0}
-.dg2-risk.dg2-warning .dg2-meter>span{background:linear-gradient(90deg,#e99a73,#ee706b)}
-.dg2-risk.dg2-warning .dg2-risk-status{background:#783c38;border-color:#eea29a}
+.dg2-level-aman .dg2-risk-status{background:#166534;border-color:#86efac;color:#f0fdf4!important}
+.dg2-level-waspada .dg2-risk-status{background:#fde047;border-color:#fef08a;color:#422006!important}
+.dg2-level-siaga .dg2-risk-status{background:#b91c1c;border-color:#fca5a5;color:#fff!important}
+.dg2-level-unavailable .dg2-risk-status{background:#475569;border-color:#cbd5e1}
+.dg2-level-aman .dg2-meter>span{background:#4ade80}
+.dg2-level-waspada .dg2-meter>span{background:#facc15}
+.dg2-level-siaga .dg2-meter>span{background:#f87171}
+.dg2-preventive{margin-top:1rem;line-height:1.55;font-size:.9rem;max-width:640px}
+.dg2-preventive strong{display:block;margin-bottom:.25rem}
+.dg2-level-guide{font-size:.76rem;color:#c0d9db!important;margin-top:.65rem}
 .dg2-score-label{margin-top:1rem;font-size:.9rem;font-weight:700;color:#bfd6d9!important}
 .dg2-risk-meta{width:100%;display:flex;gap:.6rem;flex-wrap:wrap;justify-content:space-between;font-size:.76rem;color:#c0d9db!important}
 .dg2-risk-meta span{color:#c0d9db!important}
@@ -186,6 +194,22 @@ def warning_score(probability, threshold):
     return 80 + 20 * (probability - threshold) / (1 - threshold)
 
 
+def warning_level(probability, threshold):
+    """Three display levels; only Siaga inherits the validated model threshold."""
+    score = warning_score(probability, threshold)
+    if score is None:
+        return 'unavailable', 'Belum tersedia', 'Periksa ketersediaan data dan waktu rilis sebelum menentukan tindakan.'
+    probability, threshold = float(probability), float(threshold)
+    if probability >= threshold:
+        return ('siaga', 'Siaga',
+                'Prioritaskan tanaman rentan. Terapkan pelindung tanaman yang sesuai kondisi lahan dan arahan penyuluh; pantau suhu di dekat tanaman sepanjang malam.')
+    if probability >= threshold / 2:
+        return ('waspada', 'Waspada',
+                'Siapkan penutup tanaman dan periksa alat pemantau suhu. Jika perlindungan diperlukan, pasang penutup sebelum suhu turun tajam, idealnya sebelum matahari terbenam.')
+    return ('aman', 'Aman',
+            'Tetap pantau rilis berikutnya dan kondisi lahan. Periksa kesiapan sensor serta perlengkapan pelindung; skor rendah bukan jaminan bebas frost.')
+
+
 def hero_markup(pred: dict, monitor: dict, result: dict, weather: str, now: pd.Timestamp) -> str:
     latest = pred.get("latest_release") or {}
     obs = monitor.get("latest_observation") or {}
@@ -194,12 +218,8 @@ def hero_markup(pred: dict, monitor: dict, result: dict, weather: str, now: pd.T
     threshold = _num(pred.get("threshold_stacked"))
     if probability is None:
         probability = _num(latest.get("stacked_probability"))
-    if probability is None:
-        status = "Probabilitas belum tersedia"
-    else:
-        status = ("Ambang peringatan tercapai" if threshold is not None and probability >= threshold
-                  else "Di bawah ambang model" if threshold is not None else "Ambang belum tersedia")
     score = warning_score(probability, threshold)
+    level, status, advice = warning_level(probability, threshold)
     score_text = '—' if score is None else f'{score:.1f}'
     probability_text = '—' if probability is None else f'{probability * 100:.2f}%'
     progress = 0 if score is None else score
@@ -211,6 +231,8 @@ def hero_markup(pred: dict, monitor: dict, result: dict, weather: str, now: pd.T
     release_label = f"{int(release_hour):02d}.00 WIB" if release_hour is not None else "—"
     prediction_stale = str(pred.get("data_status") or "unknown").lower() not in ("valid", "current", "fresh")
     prediction_health = "Data prediksi perlu diperiksa" if prediction_stale else "Data prediksi tersedia"
+    if prediction_stale and score is not None:
+        advice = 'Periksa waktu rilis dan pembaruan data sebelum bertindak. ' + advice
     temp = _num(params.get("tt_air_avg"))
     temp_text = "—" if temp is None else f"{temp:.1f} °C"
     obs_text = _short_time(obs.get("time_wib"))
@@ -219,7 +241,7 @@ def hero_markup(pred: dict, monitor: dict, result: dict, weather: str, now: pd.T
     image = scene_markup(now, weather, condition)
     return (
         '<section class="dg2-hero" aria-label="Ringkasan prediksi frost">'
-        f'<div class="dg2-risk{" dg2-warning" if condition else ""}">'
+        f'<div class="dg2-risk dg2-level-{level}{" dg2-warning" if condition else ""}">'
         f'<div class="dg2-risk-kicker">DIENGIN · PREDIKSI FROST · { _safe(prediction_health) }</div>'
         '<h2>Potensi frost di Dataran Tinggi Dieng</h2>'
         f'<div class="dg2-date">Tanggal target: {_safe(target)}</div>'
@@ -228,8 +250,11 @@ def hero_markup(pred: dict, monitor: dict, result: dict, weather: str, now: pd.T
         f'<div class="dg2-risk-status">● {_safe(status)}</div>'
         f'<div class="dg2-meter" aria-label="Skor peringatan, ambang 80 dari 100" {meter_attrs}><span style="width:{progress:.2f}%"></span></div>'
         f'<div class="dg2-risk-meta"><span>Ambang skor: 80/100</span><span>Rilis: {_safe(release_label)}</span></div>'
+        '<div class="dg2-level-guide">Aman: &lt;40 · Waspada: 40–&lt;80 · Siaga: ≥80</div>'
+        f'<div class="dg2-preventive"><strong>Saran preventif · {_safe(status)}</strong>{_safe(advice)}</div>'
         f'<div class="dg2-risk-explain">Probabilitas asli: {_safe(probability_text)} · Ambang model: {_safe(threshold_text)}.<br>'
         'Skor ini adalah skala tampilan, bukan persentase peluang frost atau kepastian kejadian. '
+        'Batas Waspada adalah panduan tampilan awal, belum divalidasi sebagai ambang ilmiah terpisah. '
         'Status data prediksi ditampilkan terpisah dari observasi AWS.</div></div>'
         '<div class="dg2-scene-area">'
         '<div class="dg2-scene-head">SUASANA DATARAN TINGGI DIENG · WIB</div>'
