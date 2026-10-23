@@ -221,12 +221,10 @@ def hero_markup(pred: dict, monitor: dict, result: dict, weather: str, now: pd.T
     score = warning_score(probability, threshold)
     level, status, advice = warning_level(probability, threshold)
     score_text = '—' if score is None else f'{score:.1f}'
-    probability_text = '—' if probability is None else f'{probability * 100:.2f}%'
     progress = 0 if score is None else score
     meter_attrs = (f'role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{score:.4f}"'
                    if score is not None else '')
     target = str(pred.get("target_night_date") or "—")
-    threshold_text = "—" if threshold is None else f"{threshold * 100:.2f}%"
     release_hour = _num(latest.get("hour_wib"))
     release_label = f"{int(release_hour):02d}.00 WIB" if release_hour is not None else "—"
     prediction_stale = str(pred.get("data_status") or "unknown").lower() not in ("valid", "current", "fresh")
@@ -246,16 +244,13 @@ def hero_markup(pred: dict, monitor: dict, result: dict, weather: str, now: pd.T
         '<h2>Potensi frost di Dataran Tinggi Dieng</h2>'
         f'<div class="dg2-date">Tanggal target: {_safe(target)}</div>'
         '<div class="dg2-score-label">Skor peringatan</div>'
-        f'<div class="dg2-number">{_safe(score_text)}<span>/100</span></div>'
+        f'<div class="dg2-number">{_safe(score_text)}<span>%</span></div>'
         f'<div class="dg2-risk-status">● {_safe(status)}</div>'
-        f'<div class="dg2-meter" aria-label="Skor peringatan, ambang 80 dari 100" {meter_attrs}><span style="width:{progress:.2f}%"></span></div>'
-        f'<div class="dg2-risk-meta"><span>Ambang skor: 80/100</span><span>Rilis: {_safe(release_label)}</span></div>'
-        '<div class="dg2-level-guide">Aman: &lt;40 · Waspada: 40–&lt;80 · Siaga: ≥80</div>'
+        f'<div class="dg2-meter" aria-label="Skor peringatan, ambang 80 persen" {meter_attrs}><span style="width:{progress:.2f}%"></span></div>'
+        f'<div class="dg2-risk-meta"><span>Ambang skor: 80%</span><span>Rilis: {_safe(release_label)}</span></div>'
+        '<div class="dg2-level-guide">Aman: &lt;40% · Waspada: 40–&lt;80% · Siaga: ≥80%</div>'
         f'<div class="dg2-preventive"><strong>Saran preventif · {_safe(status)}</strong>{_safe(advice)}</div>'
-        f'<div class="dg2-risk-explain">Probabilitas asli: {_safe(probability_text)} · Ambang model: {_safe(threshold_text)}.<br>'
-        'Skor ini adalah skala tampilan, bukan persentase peluang frost atau kepastian kejadian. '
-        'Batas Waspada adalah panduan tampilan awal, belum divalidasi sebagai ambang ilmiah terpisah. '
-        'Status data prediksi ditampilkan terpisah dari observasi AWS.</div></div>'
+        '</div>'
         '<div class="dg2-scene-area">'
         '<div class="dg2-scene-head">SUASANA DATARAN TINGGI DIENG · WIB</div>'
         f'<div class="dg2-scene-art">{image}</div>'

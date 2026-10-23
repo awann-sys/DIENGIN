@@ -40,11 +40,11 @@ tetap mengikuti rilis model, bukan dibuat menjadi prediksi per 10 menit.
 
 Pemeriksaan tampilan dan agregasi: `python -m unittest discover -s tests`.
 
-Kartu prediksi utama menampilkan **Skor peringatan 0–100**. Probabilitas nol
+Kartu prediksi utama menampilkan **Skor peringatan 0–100%**. Probabilitas nol
 dipetakan ke skor nol, ambang model dari konfigurasi dipetakan ke 80, dan
 probabilitas satu dipetakan ke 100, menggunakan interpolasi linear pada kedua
-interval. Angka skor bukan persentase peluang frost. Probabilitas asli dan
-ambang model tetap terlihat; grafik probabilitas, output model, dan keputusan
+interval. Angka skor bukan persentase peluang frost. Kartu utama menampilkan
+skor dan saran preventif; grafik probabilitas, output model, dan keputusan
 peringatan tetap menggunakan probabilitas serta ambang asli.
 
 Level tampilan: Aman (hijau, skor <40), Waspada (kuning, 40 hingga <80),

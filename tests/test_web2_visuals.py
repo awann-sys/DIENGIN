@@ -22,17 +22,20 @@ class TestWeb2Presentation(unittest.TestCase):
         }}
         self.now = pd.Timestamp("2026-10-19T12:10:00+07:00")
 
-    def test_hero_renders_real_probability_and_threshold(self):
+    def test_hero_renders_warning_score_percent(self):
         markup = ui.hero_markup(self.pred, self.monitor, {"probability_now": 0.0902578}, "", self.now)
-        self.assertIn("9.03", markup)
-        self.assertIn("29.70%", markup)
+        self.assertIn('24.3<span>%</span>', markup)
+        self.assertIn('Ambang skor: 80%', markup)
         self.assertIn("07.00 WIB", markup)
         self.assertIn("19.7 °C", markup)
         self.assertIn("Suasana Siang", markup)
         self.assertIn("Data prediksi perlu diperiksa", markup)
         self.assertIn('Skor peringatan', markup)
-        self.assertIn('/100', markup)
-        self.assertIn('Probabilitas asli: 9.03%', markup)
+        self.assertNotIn('/100', markup)
+        self.assertNotIn('Probabilitas asli:', markup)
+        self.assertNotIn('Skor ini adalah skala tampilan', markup)
+        self.assertNotIn('Batas Waspada adalah panduan', markup)
+        self.assertNotIn('Status data prediksi ditampilkan terpisah', markup)
 
     def test_score_endpoints_threshold_and_monotonicity(self):
         threshold = 0.2969953759055436
@@ -50,7 +53,7 @@ class TestWeb2Presentation(unittest.TestCase):
         pred = copy.deepcopy(self.pred)
         threshold = pred['threshold_stacked']
         markup = ui.hero_markup(pred, self.monitor, {'probability_now': threshold}, '', self.now)
-        self.assertIn('80.0<span>/100</span>', markup)
+        self.assertIn('80.0<span>%</span>', markup)
         self.assertIn('width:80.00%', markup)
         self.assertIn('● Siaga', markup)
         self.assertIn('dg2-level-siaga', markup)
