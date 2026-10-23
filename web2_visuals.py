@@ -47,6 +47,9 @@ CSS = r"""
 .dg2-risk-status{display:inline-flex;align-items:center;gap:.45rem;padding:.42rem .7rem;border:1px solid rgba(201,239,227,.23);border-radius:999px;background:rgba(255,255,255,.095);font-size:.8rem;font-weight:750}
 .dg2-meter{height:9px;width:100%;border-radius:20px;background:#45676c;margin:1.05rem 0 .5rem;overflow:hidden}
 .dg2-meter>span{display:block;height:100%;background:linear-gradient(90deg,#58bdba,#a7ebe0);border-radius:20px;min-width:0}
+.dg2-risk.dg2-warning .dg2-meter>span{background:linear-gradient(90deg,#e99a73,#ee706b)}
+.dg2-risk.dg2-warning .dg2-risk-status{background:#783c38;border-color:#eea29a}
+.dg2-score-label{margin-top:1rem;font-size:.9rem;font-weight:700;color:#bfd6d9!important}
 .dg2-risk-meta{width:100%;display:flex;gap:.6rem;flex-wrap:wrap;justify-content:space-between;font-size:.76rem;color:#c0d9db!important}
 .dg2-risk-meta span{color:#c0d9db!important}
 .dg2-risk-explain{max-width:640px;line-height:1.55;color:#d4e5e4!important;font-size:.85rem;margin:1rem 0 0}
@@ -173,6 +176,16 @@ def scene_markup(now: pd.Timestamp, weather: str = "", frost: bool = False) -> s
     )
 
 
+def warning_score(probability, threshold):
+    """Presentation score only: frozen model threshold maps to 80/100."""
+    probability, threshold = _num(probability), _num(threshold)
+    if probability is None or threshold is None or not 0 <= probability <= 1 or not 0 < threshold < 1:
+        return None
+    if probability <= threshold:
+        return 80 * probability / threshold
+    return 80 + 20 * (probability - threshold) / (1 - threshold)
+
+
 def hero_markup(pred: dict, monitor: dict, result: dict, weather: str, now: pd.Timestamp) -> str:
     latest = pred.get("latest_release") or {}
     obs = monitor.get("latest_observation") or {}
@@ -182,14 +195,16 @@ def hero_markup(pred: dict, monitor: dict, result: dict, weather: str, now: pd.T
     if probability is None:
         probability = _num(latest.get("stacked_probability"))
     if probability is None:
-        prob_text = "—"
         status = "Probabilitas belum tersedia"
-        progress = 0
     else:
-        prob_text = f"{probability * 100:.2f}"
-        status = ("Melebihi ambang model" if threshold is not None and probability >= threshold
+        status = ("Ambang peringatan tercapai" if threshold is not None and probability >= threshold
                   else "Di bawah ambang model" if threshold is not None else "Ambang belum tersedia")
-        progress = max(0, min(100, probability * 100))
+    score = warning_score(probability, threshold)
+    score_text = '—' if score is None else f'{score:.1f}'
+    probability_text = '—' if probability is None else f'{probability * 100:.2f}%'
+    progress = 0 if score is None else score
+    meter_attrs = (f'role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{score:.4f}"'
+                   if score is not None else '')
     target = str(pred.get("target_night_date") or "—")
     threshold_text = "—" if threshold is None else f"{threshold * 100:.2f}%"
     release_hour = _num(latest.get("hour_wib"))
@@ -204,15 +219,17 @@ def hero_markup(pred: dict, monitor: dict, result: dict, weather: str, now: pd.T
     image = scene_markup(now, weather, condition)
     return (
         '<section class="dg2-hero" aria-label="Ringkasan prediksi frost">'
-        '<div class="dg2-risk">'
+        f'<div class="dg2-risk{" dg2-warning" if condition else ""}">'
         f'<div class="dg2-risk-kicker">DIENGIN · PREDIKSI FROST · { _safe(prediction_health) }</div>'
         '<h2>Potensi frost di Dataran Tinggi Dieng</h2>'
         f'<div class="dg2-date">Tanggal target: {_safe(target)}</div>'
-        f'<div class="dg2-number">{_safe(prob_text)}<span>%</span></div>'
+        '<div class="dg2-score-label">Skor peringatan</div>'
+        f'<div class="dg2-number">{_safe(score_text)}<span>/100</span></div>'
         f'<div class="dg2-risk-status">● {_safe(status)}</div>'
-        f'<div class="dg2-meter" aria-label="Probabilitas model"><span style="width:{progress:.2f}%"></span></div>'
-        f'<div class="dg2-risk-meta"><span>Ambang model: {_safe(threshold_text)}</span><span>Rilis: {_safe(release_label)}</span></div>'
-        '<div class="dg2-risk-explain">Nilai ini adalah probabilitas model, bukan kepastian frost. '
+        f'<div class="dg2-meter" aria-label="Skor peringatan, ambang 80 dari 100" {meter_attrs}><span style="width:{progress:.2f}%"></span></div>'
+        f'<div class="dg2-risk-meta"><span>Ambang skor: 80/100</span><span>Rilis: {_safe(release_label)}</span></div>'
+        f'<div class="dg2-risk-explain">Probabilitas asli: {_safe(probability_text)} · Ambang model: {_safe(threshold_text)}.<br>'
+        'Skor ini adalah skala tampilan, bukan persentase peluang frost atau kepastian kejadian. '
         'Status data prediksi ditampilkan terpisah dari observasi AWS.</div></div>'
         '<div class="dg2-scene-area">'
         '<div class="dg2-scene-head">SUASANA DATARAN TINGGI DIENG · WIB</div>'

@@ -30,6 +30,34 @@ class TestWeb2Presentation(unittest.TestCase):
         self.assertIn("19.7 °C", markup)
         self.assertIn("Suasana Siang", markup)
         self.assertIn("Data prediksi perlu diperiksa", markup)
+        self.assertIn('Skor peringatan', markup)
+        self.assertIn('/100', markup)
+        self.assertIn('Probabilitas asli: 9.03%', markup)
+
+    def test_score_endpoints_threshold_and_monotonicity(self):
+        threshold = 0.2969953759055436
+        self.assertEqual(ui.warning_score(0, threshold), 0)
+        self.assertEqual(ui.warning_score(threshold, threshold), 80)
+        self.assertEqual(ui.warning_score(1, threshold), 100)
+        self.assertAlmostEqual(ui.warning_score(threshold / 2, threshold), 40)
+        scores = [ui.warning_score(p / 100, threshold) for p in range(101)]
+        self.assertEqual(scores, sorted(scores))
+        for p, t in [(None, threshold), (.2, None), (.2, 0), (.2, 1), (float('nan'), threshold), (1.1, threshold)]:
+            self.assertIsNone(ui.warning_score(p, t))
+
+    def test_threshold_score_and_badge_use_original_decision(self):
+        import copy
+        pred = copy.deepcopy(self.pred)
+        threshold = pred['threshold_stacked']
+        markup = ui.hero_markup(pred, self.monitor, {'probability_now': threshold}, '', self.now)
+        self.assertIn('80.0<span>/100</span>', markup)
+        self.assertIn('width:80.00%', markup)
+        self.assertIn('Ambang peringatan tercapai', markup)
+        self.assertIn('dg2-warning', markup)
+        self.assertEqual(pred, self.pred)
+        below = ui.hero_markup(pred, self.monitor, {'probability_now': threshold - .01}, '', self.now)
+        self.assertIn('Di bawah ambang model', below)
+        self.assertNotIn('dg2-warning', below)
 
     def test_missing_values_remain_missing(self):
         markup = ui.hero_markup({}, {}, {}, "", self.now)

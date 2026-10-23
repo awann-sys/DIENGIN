@@ -1,5 +1,11 @@
 name: Weather Cards UI Checks
 on:
+  push:
+    branches: [main]
+    paths:
+      - web2_visuals.py
+      - tests/test_web2_visuals.py
+      - .github/workflows/weather-card-checks.yml
   pull_request:
     paths:
       - nav_dashboard.py
