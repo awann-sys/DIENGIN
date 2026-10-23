@@ -145,10 +145,14 @@ def _load_data():
     release_history, rs = base.read_file("data/history/prediction_release_history.csv", "csv")
     nights, ns = base.read_file("data/history/prediction_night_history.csv", "csv")
     mh = base.timed_frame(monitoring_history, "observation_time_wib")
+    mh, archive_status = features.load_chart_weather_history(mh)
+    if archive_status != 'ok':
+        st.warning('Arsip AWS sejak 2021 belum dapat dimuat. Grafik sementara memakai histori monitoring terbaru; tanggal lama mungkin belum tersedia.')
     rh = base.timed_frame(release_history, "waktu_rilis_wib")
     return monitor, pred, pipeline, mh, rh, nights, {
         "monitoring": ms, "prediksi": ps, "pipeline": ss,
         "riwayat_monitoring": hs, "riwayat_rilis": rs, "riwayat_malam": ns,
+        "arsip_aws": archive_status,
     }
 
 

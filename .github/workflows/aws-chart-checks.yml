@@ -1,0 +1,36 @@
+name: AWS archive chart checks
+on:
+  push:
+    branches: [main]
+    paths:
+      - dashboard_features.py
+      - expressive_dashboard.py
+      - nav_dashboard.py
+      - tests/test_archived_charts.py
+      - .github/workflows/aws-chart-checks.yml
+  pull_request:
+    paths:
+      - dashboard_features.py
+      - expressive_dashboard.py
+      - nav_dashboard.py
+      - tests/test_archived_charts.py
+      - .github/workflows/aws-chart-checks.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dashboard dependencies
+        run: python -m pip install --retries 6 --timeout 90 -r requirements_dashboard.txt requests
+      - name: Verify historical charts and hourly rendering
+        run: |
+          python -m py_compile dashboard_features.py expressive_dashboard.py nav_dashboard.py
+          python -m unittest discover -s tests -p 'test_archived_charts.py' -v
+          python -m unittest discover -s tests -p 'test_expressive_dashboard.py' -v
+          python -m unittest discover -s tests -p 'test_interactive_history.py' -v

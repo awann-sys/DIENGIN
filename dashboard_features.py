@@ -30,6 +30,7 @@ AWS_API_BASE = "https://apiaws.bmkg.go.id"
 AWS_LOGIN_URL = f"{AWS_API_BASE}/auth/login"
 AWS_DATA_URL = f"{AWS_API_BASE}/getdata"
 AWS_STATION_ID = "STA2285"
+AWS_ARCHIVE_BASE = "https://raw.githubusercontent.com/awann-sys/DIENGIN/aws-archive/"
 
 WEATHER_VARS = {
     "Suhu udara": ("tt_air_avg", "°C"),
@@ -318,6 +319,10 @@ def _svg_chart(frame: pd.DataFrame, selected: dict[str, tuple[str, str]]) -> str
     plot_w, plot_h = width-left-right, height-top-bottom
     if frame.empty or not selected:
         return '<div class="dg-explorer-help">Belum ada data yang dapat digrafikkan.</div>'
+    daily_view = len(frame) > 4000
+    if daily_view:
+        keys = list(dict.fromkeys(key for key, _ in selected.values() if key in frame))
+        frame = frame.set_index('time')[keys].resample('1D').last().reset_index()
     t = pd.to_datetime(frame["time"], errors="coerce")
     t0, t1 = t.min(), t.max()
     span = max((t1 - t0).total_seconds(), 1.0)
@@ -342,17 +347,31 @@ def _svg_chart(frame: pd.DataFrame, selected: dict[str, tuple[str, str]]) -> str
             pad = (vmax-vmin)*0.08
             lo, hi = vmin-pad, vmax+pad
         color = palette[idx % len(palette)]
-        pts = []
+        pts, segments, segment = [], [], []
+        previous_time = None
         for row_i, value in values.items():
             if pd.isna(value):
+                if segment:
+                    segments.append(segment)
+                    segment = []
+                previous_time = None
                 continue
             ts = pd.Timestamp(frame.loc[row_i, "time"])
+            gap_limit = pd.Timedelta(days=1) if daily_view else pd.Timedelta(hours=1)
+            if previous_time is not None and ts - previous_time > gap_limit and segment:
+                segments.append(segment)
+                segment = []
             x = left + ((ts-t0).total_seconds()/span)*plot_w
             y = top + (1-(float(value)-lo)/(hi-lo))*plot_h
             pts.append((x, y, ts, float(value)))
-        if len(pts) >= 2:
-            point_text = " ".join(f"{x:.1f},{y:.1f}" for x,y,_,_ in pts)
-            parts.append(f'<polyline points="{point_text}" fill="none" stroke="{color}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>')
+            segment.append((x, y))
+            previous_time = ts
+        if segment:
+            segments.append(segment)
+        for segment in segments:
+            if len(segment) >= 2:
+                point_text = " ".join(f"{x:.1f},{y:.1f}" for x,y in segment)
+                parts.append(f'<polyline points="{point_text}" fill="none" stroke="{color}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>')
         for x,y,ts,val in pts:
             tip = html.escape(f"{ts.strftime('%d/%m %H:%M')} · {label}: {val:.2f} {unit}")
             parts.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="3.1" fill="{color}"><title>{tip}</title></circle>')
@@ -389,17 +408,23 @@ def render_custom_explorer(mh: pd.DataFrame | None, rh: pd.DataFrame | None = No
                 min_t, max_t = frame["time"].min(), frame["time"].max()
                 c1, c2 = st.columns(2)
                 with c1:
-                    start_date = st.date_input("Dari", value=min_t.date(), key=f"{key_prefix}_from_{i}")
+                    default_start = max(min_t, max_t - pd.Timedelta(days=1))
+                    start_date = st.date_input("Dari", value=default_start.date(), key=f"{key_prefix}_from_{i}")
                 with c2:
                     end_date = st.date_input("Sampai", value=max_t.date(), key=f"{key_prefix}_to_{i}")
                 start = pd.Timestamp(start_date)
                 end = pd.Timestamp(end_date) + pd.Timedelta(days=1) - pd.Timedelta(microseconds=1)
+                if end_date < start_date:
+                    st.warning('Tanggal akhir harus sama dengan atau setelah tanggal awal.')
+                    continue
                 local_time = pd.to_datetime(frame["time"], errors="coerce")
                 if getattr(local_time.dt, "tz", None) is not None:
                     start = start.tz_localize(WIB)
                     end = end.tz_localize(WIB)
                 frame = frame[(local_time >= start) & (local_time <= end)].copy()
             st.markdown('<div class="dg-explorer-card">' + _svg_chart(frame, selected) + '</div>', unsafe_allow_html=True)
+            if len(frame) > 4000:
+                st.caption('Rentang panjang: grafik menampilkan nilai valid terakhir tiap hari. Unduhan tetap memuat seluruh observasi sesuai filter.')
             if allow_download and not frame.empty:
                 st.download_button(
                     "↓ Unduh data grafik (CSV)",
@@ -551,38 +576,86 @@ def render_interactive_chart(series, key, unit, label):
     st.caption('Arahkan ke titik untuk detail. Gulir untuk zoom; geser untuk menjelajah. Jam tanpa data tetap menjadi jeda.')
 
 
-@st.cache_data(ttl=900, show_spinner=False)
-def fetch_stored_aws_archive(start_iso, end_iso):
+@st.cache_data(ttl=900, max_entries=16, show_spinner=False)
+def _read_aws_archive_file(relative):
+    """CSV is exported from the same observations as the archive SQLite DB."""
     import gzip
+    request = urllib.request.Request(AWS_ARCHIVE_BASE + relative, headers={'User-Agent': 'DIENGIN/1.0'})
+    with urllib.request.urlopen(request, timeout=90) as response:
+        data = pd.read_csv(io.BytesIO(gzip.decompress(response.read())))
+    data['_time'] = pd.to_datetime(data['datetime_utc'], utc=True, errors='coerce').dt.tz_convert(WIB)
+    for col in list(data.columns):
+        if col.endswith('_flag') and col[:-5] in data:
+            data.loc[pd.to_numeric(data[col], errors='coerce').eq(1), col[:-5]] = float('nan')
+    return data.dropna(subset=['_time']).sort_values('_time').drop_duplicates('_time', keep='last')
+
+
+@st.cache_data(ttl=900, max_entries=1, show_spinner=False)
+def _chart_archive():
+    data = _read_aws_archive_file('aws_dieng_merged.csv.gz')
+    return data[['_time'] + [key for key, _ in WEATHER_VARS.values() if key in data]].copy()
+
+
+def merge_chart_weather_history(recent, archive):
+    """Prefer QC-cleaned archive values at overlaps, retain new runtime samples."""
+    frames = []
+    for source in (recent, archive):
+        if source is None or source.empty:
+            continue
+        data = source.copy()
+        time_col = '_time' if '_time' in data else 'observation_time_wib'
+        if time_col not in data:
+            continue
+        def wib_time(value):
+            try:
+                ts = pd.Timestamp(value)
+                return ts.tz_localize(WIB) if ts.tzinfo is None else ts.tz_convert(WIB)
+            except (ValueError, TypeError):
+                return pd.NaT
+        if isinstance(data[time_col].dtype, pd.DatetimeTZDtype):
+            data['_time'] = data[time_col].dt.tz_convert(WIB)
+        elif pd.api.types.is_datetime64_dtype(data[time_col]):
+            data['_time'] = data[time_col].dt.tz_localize(WIB)
+        else:
+            data['_time'] = pd.to_datetime(data[time_col].map(wib_time))
+        frames.append(data)
+    if not frames:
+        return pd.DataFrame()
+    return (pd.concat(frames, ignore_index=True, sort=False).dropna(subset=['_time'])
+            .drop_duplicates('_time', keep='last').sort_values('_time').reset_index(drop=True))
+
+
+def load_chart_weather_history(recent):
+    try:
+        return merge_chart_weather_history(recent, _chart_archive()), 'ok'
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError, KeyError, EOFError):
+        return recent, 'unavailable'
+
+
+@st.cache_data(ttl=900, max_entries=16, show_spinner=False)
+def fetch_stored_aws_archive(start_iso, end_iso):
     start, end = pd.Timestamp(start_iso), pd.Timestamp(end_iso)
+    start = start.tz_localize(WIB) if start.tzinfo is None else start.tz_convert(WIB)
+    end = end.tz_localize(WIB) if end.tzinfo is None else end.tz_convert(WIB)
     if end <= start:
         raise ValueError('Tanggal akhir harus setelah tanggal awal.')
     frames = []
     if end - start > pd.Timedelta(days=31):
-        urls = ['https://raw.githubusercontent.com/awann-sys/DIENGIN/aws-archive/aws_dieng_merged.csv.gz']
+        files = ['aws_dieng_merged.csv.gz']
     else:
         months = pd.period_range(start.tz_convert('UTC').tz_localize(None).to_period('M'), end.tz_convert('UTC').tz_localize(None).to_period('M'), freq='M')
-        urls = [f'https://raw.githubusercontent.com/awann-sys/DIENGIN/aws-archive/observations/{month}.csv.gz' for month in months]
-    for url in urls:
-        try:
-            with urllib.request.urlopen(url, timeout=90) as response:
-                frames.append(pd.read_csv(io.BytesIO(gzip.decompress(response.read()))))
-        except urllib.error.HTTPError as error:
-            if error.code != 404:
-                raise
+        files = [f'observations/{month}.csv.gz' for month in months]
+    for relative in files:
+        frames.append(_read_aws_archive_file(relative))
     if not frames:
         return pd.DataFrame()
     data = pd.concat(frames, ignore_index=True)
-    data['_time'] = pd.to_datetime(data['datetime_utc'], utc=True).dt.tz_convert(WIB)
-    for col in list(data.columns):
-        if col.endswith('_flag') and col[:-5] in data:
-            data.loc[pd.to_numeric(data[col], errors='coerce').eq(1), col[:-5]] = float('nan')
     return data[data['_time'].between(start, end)].sort_values('_time').drop_duplicates('_time')
 
 
 def render_on_demand_monitoring_explorer() -> None:
     st.subheader("Eksplorasi Data AWS")
-    st.caption("Pilih rentang tanggal dan jam. Data baru diminta dari AWS BMKG setelah tombol Muat Data ditekan.")
+    st.caption("Pilih rentang tanggal dan jam untuk membaca arsip AWS atau mengambil data langsung dari BMKG.")
     source = st.selectbox('Sumber histori', ['Arsip tersimpan', 'Ambil langsung dari BMKG'], key='aws_history_source')
     st.caption('Arsip bulanan mulai 2021 mendukung rentang lintas bulan/tahun. Permintaan langsung ke BMKG pada menu ini dibatasi 31 hari.')
     now = pd.Timestamp.now(tz=WIB).floor("10min")
@@ -604,7 +677,7 @@ def render_on_demand_monitoring_explorer() -> None:
             st.session_state["aws_requested_range"] = (start, end)
         except (ValueError, RuntimeError, urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, json.JSONDecodeError):
             st.session_state.pop('aws_requested_history', None)
-            st.error('Data belum dapat dimuat. Periksa rentang (maksimal 31 hari), ketersediaan arsip, serta kredensial AWS BMKG pada deployment.')
+            st.error('Data belum dapat dimuat. Periksa ketersediaan arsip. Untuk sumber langsung BMKG, rentang maksimal 31 hari dan kredensial AWS harus tersedia.')
     frame = st.session_state.get("aws_requested_history")
     if isinstance(frame, pd.DataFrame):
         if frame.empty:

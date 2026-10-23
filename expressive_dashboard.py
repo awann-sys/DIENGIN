@@ -194,7 +194,9 @@ def render_journey(mh, rh, pred, *, include_models=True):
         if not frame.empty and selected:
             key, unit = selected[label]
             date_col1, date_col2 = st.columns(2)
-            first, last = frame['time'].min().date(), frame['time'].max().date()
+            last_time = frame['time'].max()
+            first = max(frame['time'].min(), last_time - pd.Timedelta(days=1)).date()
+            last = last_time.date()
             prefix = 'prediction' if include_models else 'monitoring'
             with date_col1:
                 start = st.date_input('Dari tanggal (WIB)', value=first, key=f'{prefix}_chart_start')

@@ -21,4 +21,13 @@ maksimum. Data lama yang belum memiliki parameter tersebut ditampilkan sebagai
 `—`; satuan yang belum terverifikasi tetap dilabeli `unit AWS`. Pembaruan ini
 tidak mengubah model, jadwal pengambilan AWS, atau jadwal rilis probabilitas.
 
+Semua grafik cuaca pada Prediksi Frost, Monitoring AWS, dan Tren & Historis
+membaca arsip AWS sejak 2021, digabung dengan observasi runtime terbaru.
+Arsip CSV berasal dari tabel observasi yang sama dengan database SQLite.
+Nilai yang gagal QC tetap kosong; arsip menjadi acuan pada timestamp yang sama.
+Grafik awal menampilkan rentang terbaru, dan filter tanggal dapat memilih tahun
+sebelumnya. Kegagalan memuat arsip ditampilkan sebagai peringatan, sementara
+histori runtime tetap dapat dibaca. Probabilitas model tetap berasal dari
+riwayat rilis model, tanpa menghitung ulang atau mengarang prediksi historis.
+
 Pemeriksaan tampilan dan agregasi: `python -m unittest discover -s tests`.
