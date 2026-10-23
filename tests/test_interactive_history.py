@@ -16,7 +16,7 @@ class InteractiveHistoryTests(unittest.TestCase):
         with patch.object(features.st, 'altair_chart') as output, patch.object(features.st, 'caption'):
             features.render_interactive_chart(data, 'temperature', '°C', 'Suhu')
         chart = output.call_args.args[0].to_dict()
-        rows = next(iter(chart['datasets'].values()))
+        rows = chart.get('data', {}).get('values') or next(iter(chart['datasets'].values()))
         self.assertEqual(len(rows), 3)
         self.assertEqual(rows[0]['Waktu WIB'], '19/10/2026 21:00')
         self.assertNotEqual(rows[0]['segment'], rows[1]['segment'])

@@ -209,15 +209,20 @@ def render_journey(mh, rh, pred, *, include_models=True):
             if frame.empty:
                 st.info('Tidak ada observasi pada rentang ini.')
                 return
-            series = hourly_series(frame, key)
-            features.render_interactive_chart(series, key, unit, label)
+            if label in features.WEATHER_VARS:
+                resolution = st.selectbox('Resolusi grafik', features.CHART_RESOLUTIONS, key=f'{prefix}_chart_resolution')
+                series = frame.set_index('time')[[key]]
+                features.render_interactive_chart(series, key, unit, label, resolution=resolution)
+            else:
+                series = hourly_series(frame, key)
+                features.render_interactive_chart(series, key, unit, label)
             export = frame[['time', key]].rename(columns={'time': 'waktu_wib'})
             st.download_button('Unduh data sesuai filter (CSV)', export.to_csv(index=False).encode('utf-8-sig'), file_name=f'diengin_{key}_{start}_{end}.csv', mime='text/csv', key=f'{prefix}_chart_download')
             with st.expander('Tampilkan data sesuai filter'):
                 st.dataframe(export, hide_index=True, use_container_width=True)
             if not series.empty:
                 st.caption(f"{series.index.min():%d %b %Y} – {series.index.max():%d %b %Y} · WIB · {unit}")
-            st.caption("Titik setiap 1 jam · nilai valid terakhir dalam jam yang berakhir pada label waktu · jam kosong menjadi jeda. Observasi terbaru tetap tersedia di kartu cuaca.")
+            st.caption("Jam tanpa data tetap menjadi jeda. Observasi terbaru tersedia di kartu cuaca; probabilitas model mengikuti jadwal rilis.")
         else:
             st.info("Riwayat parameter ini belum tersedia.")
 

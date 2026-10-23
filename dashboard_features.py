@@ -53,6 +53,31 @@ MODEL_VARS = {
     "Probabilitas Stacked / Final": ("stack_prob", "%"),
 }
 
+CHART_RESOLUTIONS = ['Otomatis', '10 menit (data asli)', '1 jam', '1 hari']
+
+
+def chart_resolution_series(series, resolution='Otomatis'):
+    """Explicit native mode never downsamples, fills, or creates observations."""
+    data = series.copy().sort_index()
+    data = data.apply(pd.to_numeric, errors='coerce').replace([float('inf'), -float('inf')], float('nan'))
+    data = data.groupby(level=0).last()
+    actual = ('1 hari' if len(data) > 4000 else '1 jam') if resolution == 'Otomatis' else resolution
+    if actual not in CHART_RESOLUTIONS:
+        raise ValueError('Resolusi grafik tidak dikenal.')
+    if data.empty or actual == '10 menit (data asli)':
+        return data, actual
+    if actual == '1 hari':
+        return data.resample('1D').last(), actual
+    latest = data.index.max().floor('h')
+    data = data.resample('1h', closed='right', label='right').last()
+    return data.loc[data.index <= latest], actual
+
+
+def resolution_caption(actual):
+    if actual == '10 menit (data asli)':
+        return 'Resolusi asli: setiap observasi AWS (nominal 10 menit), tanpa interpolasi. Probabilitas model tetap hanya pada waktu rilis yang tersedia.'
+    return f'Resolusi {actual}: nilai valid terakhir tiap periode. Data hilang tetap kosong; tabel dan unduhan memuat observasi asli.'
+
 CARD_CSS = r"""
 <style>
 .dg-current-wrap{margin:2rem 0 1.65rem}
@@ -313,16 +338,18 @@ def _series_frame(mh: pd.DataFrame | None, rh: pd.DataFrame | None, labels: list
     return merged, selected
 
 
-def _svg_chart(frame: pd.DataFrame, selected: dict[str, tuple[str, str]]) -> str:
+def _svg_chart(frame: pd.DataFrame, selected: dict[str, tuple[str, str]], resolution='Otomatis') -> str:
     width, height = 1100, 390
     left, right, top, bottom = 70, 30, 35, 65
     plot_w, plot_h = width-left-right, height-top-bottom
     if frame.empty or not selected:
         return '<div class="dg-explorer-help">Belum ada data yang dapat digrafikkan.</div>'
-    daily_view = len(frame) > 4000
-    if daily_view:
-        keys = list(dict.fromkeys(key for key, _ in selected.values() if key in frame))
-        frame = frame.set_index('time')[keys].resample('1D').last().reset_index()
+    keys = list(dict.fromkeys(key for key, _ in selected.values() if key in frame))
+    data, actual = chart_resolution_series(frame.set_index('time')[keys], resolution)
+    frame = data.reset_index()
+    daily_view = actual == '1 hari'
+    if frame.empty:
+        return '<div class="dg-explorer-help">Belum ada periode lengkap pada rentang ini.</div>'
     t = pd.to_datetime(frame["time"], errors="coerce")
     t0, t1 = t.min(), t.max()
     span = max((t1 - t0).total_seconds(), 1.0)
@@ -357,7 +384,7 @@ def _svg_chart(frame: pd.DataFrame, selected: dict[str, tuple[str, str]]) -> str
                 previous_time = None
                 continue
             ts = pd.Timestamp(frame.loc[row_i, "time"])
-            gap_limit = pd.Timedelta(days=1) if daily_view else pd.Timedelta(hours=1)
+            gap_limit = pd.Timedelta(days=1) if daily_view else pd.Timedelta(minutes=10) if actual == '10 menit (data asli)' else pd.Timedelta(hours=1)
             if previous_time is not None and ts - previous_time > gap_limit and segment:
                 segments.append(segment)
                 segment = []
@@ -372,7 +399,7 @@ def _svg_chart(frame: pd.DataFrame, selected: dict[str, tuple[str, str]]) -> str
             if len(segment) >= 2:
                 point_text = " ".join(f"{x:.1f},{y:.1f}" for x,y in segment)
                 parts.append(f'<polyline points="{point_text}" fill="none" stroke="{color}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>')
-        for x,y,ts,val in pts:
+        for x,y,ts,val in pts if len(pts) <= 10000 else []:
             tip = html.escape(f"{ts.strftime('%d/%m %H:%M')} · {label}: {val:.2f} {unit}")
             parts.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="3.1" fill="{color}"><title>{tip}</title></circle>')
         legend.append(f'<span class="dg-scale-chip"><b>{html.escape(label)}</b> · {_fmt(vmin)}–{_fmt(vmax)} {html.escape(unit)}</span>')
@@ -403,6 +430,7 @@ def render_custom_explorer(mh: pd.DataFrame | None, rh: pd.DataFrame | None = No
                 key=f"{key_prefix}_vars_{i}",
                 placeholder="Pilih satu atau beberapa variabel",
             )
+            resolution = st.selectbox('Resolusi grafik', CHART_RESOLUTIONS, key=f'{key_prefix}_resolution_{i}')
             frame, selected = _series_frame(mh, rh, selected_labels)
             if not frame.empty:
                 min_t, max_t = frame["time"].min(), frame["time"].max()
@@ -422,9 +450,10 @@ def render_custom_explorer(mh: pd.DataFrame | None, rh: pd.DataFrame | None = No
                     start = start.tz_localize(WIB)
                     end = end.tz_localize(WIB)
                 frame = frame[(local_time >= start) & (local_time <= end)].copy()
-            st.markdown('<div class="dg-explorer-card">' + _svg_chart(frame, selected) + '</div>', unsafe_allow_html=True)
-            if len(frame) > 4000:
-                st.caption('Rentang panjang: grafik menampilkan nilai valid terakhir tiap hari. Unduhan tetap memuat seluruh observasi sesuai filter.')
+            st.markdown('<div class="dg-explorer-card">' + _svg_chart(frame, selected, resolution) + '</div>', unsafe_allow_html=True)
+            if not frame.empty:
+                _, actual = chart_resolution_series(frame.set_index('time')[list(dict.fromkeys(k for k, _ in selected.values()))], resolution)
+                st.caption(resolution_caption(actual))
             if allow_download and not frame.empty:
                 st.download_button(
                     "↓ Unduh data grafik (CSV)",
@@ -542,28 +571,31 @@ def fetch_aws_history(start_wib_iso: str, end_wib_iso: str) -> pd.DataFrame:
     return df.dropna(subset=["_time"]).sort_values("_time").drop_duplicates("_time", keep="last").reset_index(drop=True)
 
 
-def render_interactive_chart(series, key, unit, label):
+def render_interactive_chart(series, key, unit, label, resolution='Otomatis'):
     import altair as alt
     if series.empty or key not in series or series[key].dropna().empty:
         st.info('Belum ada data valid pada rentang ini.')
         return
-    daily_view = len(series) > 4000
-    data = series[[key]].resample('1D').last() if daily_view else series[[key]].copy()
+    data, actual = chart_resolution_series(series[[key]], resolution)
+    daily_view = actual == '1 hari'
     # Plot wall-clock WIB on a UTC scale so browser timezone cannot shift labels.
     local = pd.DatetimeIndex(data.index)
     if local.tz is not None:
         local = local.tz_convert(WIB).tz_localize(None)
     data['wib'] = local.tz_localize('UTC').as_unit('ms').asi8
     data['Waktu WIB'] = local.strftime('%d/%m/%Y %H:%M')
-    gap = pd.Series(local, index=data.index).diff().gt(pd.Timedelta(days=1) if daily_view else pd.Timedelta(hours=1))
+    gap_limit = pd.Timedelta(days=1) if daily_view else pd.Timedelta(minutes=10) if actual == '10 menit (data asli)' else pd.Timedelta(hours=1)
+    gap = pd.Series(local, index=data.index).diff().gt(gap_limit)
     data['segment'] = (data[key].isna() | gap).cumsum()
     data = data.dropna(subset=[key]).reset_index(drop=True)
-    base = alt.Chart(data).encode(
+    base = alt.Chart(alt.InlineData(values=data.to_dict('records'))).encode(
         x=alt.X('wib:T', title='Waktu (WIB)', scale=alt.Scale(type='utc'), axis=alt.Axis(format='%d/%m %H:%M', labelOverlap=True)),
         y=alt.Y(f'{key}:Q', title=f'{label} ({unit})', scale=alt.Scale(domain=[0, 100]) if 'Probabilitas' in label else alt.Scale(zero=False)),
         tooltip=[alt.Tooltip('Waktu WIB:N'), alt.Tooltip(f'{key}:Q', title=f'{label} ({unit})', format='.2f')],
     )
-    chart = base.mark_line(color='#48BDB4', strokeWidth=2.5).encode(detail='segment:N') + base.mark_circle(color='#48BDB4', size=35)
+    chart = base.mark_line(color='#48BDB4', strokeWidth=2.5).encode(detail='segment:N')
+    if len(data) <= 10000:
+        chart = chart + base.mark_circle(color='#48BDB4', size=35)
     from theme_controller import current_theme
     dark = current_theme() == 'dark'
     chart = chart.properties(height=330, background='transparent').interactive().configure_view(stroke=None).configure_axis(
@@ -571,8 +603,7 @@ def render_interactive_chart(series, key, unit, label):
         gridColor='#29394E' if dark else '#E5ECF5', domain=False, tickCount=6,
     )
     st.altair_chart(chart, use_container_width=True, theme=None)
-    if daily_view:
-        st.caption('Rentang panjang: grafik menampilkan nilai valid terakhir tiap hari. Tabel dan unduhan tetap memuat seluruh observasi sesuai filter.')
+    st.caption(resolution_caption(actual))
     st.caption('Arahkan ke titik untuk detail. Gulir untuk zoom; geser untuk menjelajah. Jam tanpa data tetap menjadi jeda.')
 
 
@@ -688,8 +719,9 @@ def render_on_demand_monitoring_explorer() -> None:
         st.caption(f'Rentang yang dimuat: {loaded_start:%d/%m/%Y %H:%M} – {loaded_end:%d/%m/%Y %H:%M} WIB. Ubah tanggal lalu tekan Muat Data untuk memperbarui hasil.')
         selected_label = st.selectbox('Parameter data unduhan', list(WEATHER_VARS), key='aws_download_parameter')
         field, unit = WEATHER_VARS[selected_label]
+        resolution = st.selectbox('Resolusi grafik', CHART_RESOLUTIONS, key='aws_download_resolution')
         if field in frame:
-            render_interactive_chart(frame.set_index('_time')[[field]], field, unit, selected_label)
+            render_interactive_chart(frame.set_index('_time')[[field]], field, unit, selected_label, resolution)
         with st.expander('Tampilkan observasi yang diunduh'):
             st.dataframe(frame, hide_index=True, use_container_width=True)
         st.download_button(

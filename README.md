@@ -30,4 +30,12 @@ sebelumnya. Kegagalan memuat arsip ditampilkan sebagai peringatan, sementara
 histori runtime tetap dapat dibaca. Probabilitas model tetap berasal dari
 riwayat rilis model, tanpa menghitung ulang atau mengarang prediksi historis.
 
+Grafik cuaca menyediakan resolusi Otomatis, 10 menit (data asli), 1 jam, dan
+1 hari. Pilihan resolusi asli mempertahankan semua titik, termasuk pada rentang
+panjang; mode otomatis dapat merangkum harian. Agregasi memakai nilai valid
+terakhir per periode, tanpa interpolasi. Untuk lebih dari 10.000 titik, grafik
+memakai garis tanpa lingkaran individual agar lebih ringan; seluruh titik
+tetap dipakai. Tabel dan CSV selalu berisi observasi asli. Resolusi probabilitas
+tetap mengikuti rilis model, bukan dibuat menjadi prediksi per 10 menit.
+
 Pemeriksaan tampilan dan agregasi: `python -m unittest discover -s tests`.

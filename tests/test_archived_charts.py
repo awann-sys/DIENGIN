@@ -10,6 +10,33 @@ import dashboard_features as features
 
 
 class ArchiveChartTests(unittest.TestCase):
+    def test_native_resolution_preserves_every_sample_even_for_long_ranges(self):
+        index = pd.date_range('2026-01-01', periods=5001, freq='10min', tz=features.WIB)
+        data = pd.DataFrame({'temperature': range(5001)}, index=index, dtype=float)
+        data.iloc[2, 0] = float('nan')
+        native, actual = features.chart_resolution_series(data, '10 menit (data asli)')
+        self.assertEqual(actual, '10 menit (data asli)')
+        pd.testing.assert_frame_equal(native, data, check_freq=False)
+        automatic, actual = features.chart_resolution_series(data, 'Otomatis')
+        self.assertEqual(actual, '1 hari')
+        self.assertLess(len(automatic), len(data))
+
+    def test_hourly_and_daily_resolution_use_last_valid_without_filling_gaps(self):
+        data = pd.DataFrame({'temperature': [4., 3., 2.]}, index=pd.to_datetime([
+            '2026-01-01T00:00:00+07:00', '2026-01-01T00:10:00+07:00', '2026-01-01T03:00:00+07:00']))
+        hourly, actual = features.chart_resolution_series(data, '1 jam')
+        self.assertEqual(hourly.iloc[1, 0], 3.)
+        self.assertTrue(pd.isna(hourly.iloc[2, 0]))
+        daily, actual = features.chart_resolution_series(data, '1 hari')
+        self.assertEqual(len(daily), 1)
+        self.assertEqual(daily.iloc[0, 0], 2.)
+
+    def test_custom_native_chart_keeps_all_ten_minute_points(self):
+        frame = pd.DataFrame({'time': pd.date_range('2026-01-01', periods=7, freq='10min', tz=features.WIB), 'tt_air_avg': range(7)})
+        selected = {'Suhu udara': ('tt_air_avg', '°C')}
+        self.assertEqual(features._svg_chart(frame, selected, '10 menit (data asli)').count('<circle'), 7)
+        self.assertEqual(features._svg_chart(frame, selected, '1 jam').count('<circle'), 2)
+
     def test_overlap_preserves_archive_missing_and_zero_and_extends_latest(self):
         recent = pd.DataFrame({
             '_time': pd.to_datetime(['2026-01-01T00:00:00+07:00', '2026-01-01T00:10:00+07:00', '2026-10-23T00:00:00+07:00']),
@@ -68,7 +95,7 @@ from unittest.mock import patch
 archive = pd.DataFrame({'_time': pd.to_datetime(['2021-01-01T00:00:00Z', '2026-01-01T00:00:00Z', '2026-03-04T00:00:00Z', '2026-10-23T00:00:00Z']), 'tt_air_avg': [3., 4., 5., 6.]})
 with patch.object(features, '_chart_archive', return_value=archive), patch.object(nav.base, 'read_file', side_effect=lambda relative, kind='json': ((pd.DataFrame() if kind == 'csv' else {}), 'ok')):
     _, _, _, mh, rh, _, _ = nav._load_data()
-with patch.object(features, 'render_interactive_chart', side_effect=lambda series, key, unit, label: st.text('SERIES=' + ','.join(series[key].dropna().astype(str)))), patch.object(st, 'dataframe'):
+with patch.object(features, 'render_interactive_chart', side_effect=lambda series, key, unit, label, **kwargs: st.text('SERIES=' + ','.join(series[key].dropna().astype(str)))), patch.object(st, 'dataframe'):
     design.render_journey(mh, rh, {}, include_models=False)
     features.render_custom_explorer(mh, rh, key_prefix='archive_test', include_models=False, default_labels=['Suhu udara'], allow_download=True)
 '''
