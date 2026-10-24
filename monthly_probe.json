@@ -1,0 +1,26 @@
+{
+  "checked_utc": "2026-10-19T17:28:14.816227+00:00",
+  "results": {
+    "current_month": {
+      "status": "error",
+      "error_type": "RuntimeError",
+      "detail": "API AWS menolak request: Tanggal Yang anda masukkan tidak valid dan range tanggal tidak boleh lebih dari satu hari (24 jam)"
+    },
+    "reference_day": {
+      "request_start_wib": "2026-10-19T00:00:00+07:00",
+      "request_end_wib": "2026-10-19T23:59:59+07:00",
+      "status": "ok",
+      "rows": 144,
+      "first_wib": "2026-10-19T00:00:00+07:00",
+      "last_wib": "2026-10-19T23:50:00+07:00",
+      "days_returned": 1
+    },
+    "january_2020": {
+      "status": "error",
+      "error_type": "RuntimeError",
+      "detail": "API AWS menolak request: Tanggal Yang anda masukkan tidak valid dan range tanggal tidak boleh lebih dari satu hari (24 jam)"
+    }
+  },
+  "monthly_contains_reference_day": false,
+  "note": "Empty responses alone do not verify monthly support or historical absence; inspect timestamps and the reference-day comparison."
+}
