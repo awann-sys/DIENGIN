@@ -1,0 +1,2 @@
+generated_at_wib,observation_time_wib,data_age_minutes,freshness_status,monitoring_status,tt_air_avg,tt_air_min,rh_avg,ws_avg,wd_avg,rr,pp_air,dew_point_c,tt_air_max,ws_max,sr_avg,sr_max
+2026-10-29T09:04:07.074635+07:00,2026-10-29T08:50:00+07:00,14.117910583333332,current,valid,19.65,16.75,76.63,2.652,112.9,0.0,800.9605,15.430838542759313,20.06,5.52,726.0,1105.0
