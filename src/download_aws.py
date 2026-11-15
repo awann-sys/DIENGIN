@@ -3,9 +3,9 @@
 DIENGIN - Tahap 2
 Downloader AWS BMKG untuk STA2285 (Dieng) - v3
 
-Pipeline operasional mengambil Excel mentah dari endpoint rawdata AWS Center,
-menggabungkan unduhan arsip bulanan dengan suplemen bulan berjalan, lalu
-menormalisasi observasi terbaru untuk monitoring dan prediksi.
+Pipeline operasional mengunduh Excel bulanan dari endpoint rawdata AWS Center
+menggunakan route downloadaccesdata_year, lalu menormalisasi observasi terbaru
+untuk monitoring dan prediksi.
 
 Catatan:
 - Jalur operasional ini tidak memerlukan AWS API token.
@@ -229,22 +229,16 @@ def request_data(
 
 
 
-def raw_month_url(year: int, month: int, today) -> tuple[str, str, str]:
-    """Build the BMKG raw Excel URL for one calendar month."""
+def raw_month_url(year: int, month: int, today) -> str:
+    """Build the year-scoped raw Excel URL using BMKG's downloadaccesdata_year route."""
     first = f"{year}-{month:02d}-01"
     month_last = calendar.monthrange(year, month)[1]
     last_day = min(month_last, today.day) if (year, month) == (today.year, today.month) else month_last
     last = f"{year}-{month:02d}-{last_day:02d}"
-    route = (
-        "downloadaccesdata_currentyear"
-        if year == today.year
-        else f"downloadaccesdata_year/{year}"
+    return (
+        f"{RAW_BASE}/downloadaccesdata_year/{year}/"
+        f"{STATION_TYPE}/{STATION_ID}/{first}/{last}"
     )
-    url = f"{RAW_BASE}/{route}/{STATION_TYPE}/{STATION_ID}/{first}/{last}"
-    # Live supplement for the current month; this is the same rawdata export
-    # route family and avoids depending on the lagging yearly spreadsheet.
-    live_url = f"{RAW_BASE}/downloadaccesdata/{STATION_TYPE}/{STATION_ID}/{first}/{last}"
-    return url, live_url, last
 
 
 def fetch_raw_excel(session: requests.Session, url: str) -> bytes:
@@ -318,15 +312,10 @@ def request_raw_export(
 
     frames = []
     for year, month in months:
-        url, live_url, last = raw_month_url(year, month, today)
-        base_content = fetch_raw_excel(session, url)
-        (RAW_DIR / f"aws_{STATION_ID}_{year}-{month:02d}_raw.xlsx").write_bytes(base_content)
-        frames.append(raw_excel_to_frame(base_content))
-
-        if (year, month) == (today.year, today.month):
-            live_content = fetch_raw_excel(session, live_url)
-            (RAW_DIR / f"aws_{STATION_ID}_{year}-{month:02d}_recent.xlsx").write_bytes(live_content)
-            frames.append(raw_excel_to_frame(live_content))
+        url = raw_month_url(year, month, today)
+        content = fetch_raw_excel(session, url)
+        (RAW_DIR / f"aws_{STATION_ID}_{year}-{month:02d}_raw.xlsx").write_bytes(content)
+        frames.append(raw_excel_to_frame(content))
 
     if not frames:
         raise RuntimeError("Endpoint rawdata tidak menghasilkan file untuk rentang ini.")
