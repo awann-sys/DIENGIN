@@ -4,7 +4,7 @@ DIENGIN - Tahap 2
 Downloader AWS BMKG untuk STA2285 (Dieng) - v3
 
 Pipeline operasional mengunduh Excel bulanan dari endpoint rawdata AWS Center
-menggunakan route downloadaccesdata_year, lalu menormalisasi observasi terbaru
+menggunakan route downloadaccesdata dengan rentang bulanan, lalu menormalisasi observasi terbaru
 untuk monitoring dan prediksi.
 
 Catatan:
@@ -230,13 +230,13 @@ def request_data(
 
 
 def raw_month_url(year: int, month: int, today) -> str:
-    """Build the year-scoped raw Excel URL using BMKG's downloadaccesdata_year route."""
+    """Build a monthly raw Excel URL using BMKG's date-range downloadaccesdata route."""
     first = f"{year}-{month:02d}-01"
     month_last = calendar.monthrange(year, month)[1]
     last_day = min(month_last, today.day) if (year, month) == (today.year, today.month) else month_last
     last = f"{year}-{month:02d}-{last_day:02d}"
     return (
-        f"{RAW_BASE}/downloadaccesdata_year/{year}/"
+        f"{RAW_BASE}/downloadaccesdata/"
         f"{STATION_TYPE}/{STATION_ID}/{first}/{last}"
     )
 
@@ -551,7 +551,7 @@ def main() -> int:
         print(f"Terbaru UTC   : {latest_utc}")
         print(f"Terbaru WIB   : {latest_wib}")
         print(f"CSV           : {CSV_PATH}")
-        print(f"Raw JSON      : {RAW_JSON_PATH}")
+        print(f"Raw CSV       : {RAW_EXPORT_PATH}")
 
         # Ringkasan flag untuk audit operasional.
         print("")
