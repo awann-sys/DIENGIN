@@ -1,29 +1,22 @@
 #!/usr/bin/env python3
 """
 DIENGIN - Tahap 2
-Downloader AWS BMKG untuk STA2285 (Dieng) - v2
+Downloader AWS BMKG untuk STA2285 (Dieng) - v3
 
-Fungsi:
-1. Login ke API AWS Center BMKG atau memakai token yang sudah tersedia.
-2. Mengambil data rolling hingga 24 jam terakhir dari STA2285.
-3. Menyimpan respons mentah JSON.
-4. Menormalisasi parameter yang dibutuhkan DIENGIN.
-5. Mengubah waktu UTC -> Asia/Jakarta.
-6. Menghitung dew point dari tt_air_avg dan rh_avg.
-7. Deduplicate timestamp dan menyimpan CSV terbaru.
-
-Environment variables:
-- AWS_API_TOKEN      : opsional. Jika ada, login tidak dilakukan.
-- AWS_API_USERNAME   : diperlukan jika AWS_API_TOKEN tidak ada.
-- AWS_API_PASSWORD   : diperlukan jika AWS_API_TOKEN tidak ada.
+Pipeline operasional mengambil Excel mentah dari endpoint rawdata AWS Center,
+menggabungkan unduhan arsip bulanan dengan suplemen bulan berjalan, lalu
+menormalisasi observasi terbaru untuk monitoring dan prediksi.
 
 Catatan:
-- Jangan hard-code kredensial.
-- API resmi membatasi satu request maksimum 24 jam.
+- Jalur operasional ini tidak memerlukan AWS API token.
+- Stasiun DIENGIN tetap AWS Batur STA2285. ID 160010 pada contoh lama adalah
+  AWS Tambi, jadi tidak dipakai untuk masukan model Batur.
 """
 
 from __future__ import annotations
 
+import calendar
+import io
 import json
 import math
 import os
@@ -42,6 +35,7 @@ DATA_URL = f"{API_BASE}/getdata"
 
 STATION_ID = "STA2285"
 STATION_TYPE = "aws"
+RAW_BASE = "https://apiaws.bmkg.go.id/rawdata"
 
 # Parameter yang digunakan pipeline DIENGIN
 PARAMETERS = [
@@ -80,7 +74,7 @@ PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
 STATUS_DIR.mkdir(parents=True, exist_ok=True)
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 
-RAW_JSON_PATH = RAW_DIR / f"aws_{STATION_ID}_latest.json"
+RAW_EXPORT_PATH = RAW_DIR / f"aws_{STATION_ID}_raw_latest.csv"
 CSV_PATH = PROCESSED_DIR / "aws_dieng_latest.csv"
 STATUS_PATH = STATUS_DIR / "aws_ingestion_status.json"
 LOG_PATH = LOG_DIR / "aws_ingestion.log"
@@ -232,6 +226,120 @@ def request_data(
         return collected[0]
 
     return collected
+
+
+
+def raw_month_url(year: int, month: int, today) -> tuple[str, str, str]:
+    """Build the BMKG raw Excel URL for one calendar month."""
+    first = f"{year}-{month:02d}-01"
+    month_last = calendar.monthrange(year, month)[1]
+    last_day = min(month_last, today.day) if (year, month) == (today.year, today.month) else month_last
+    last = f"{year}-{month:02d}-{last_day:02d}"
+    route = (
+        "downloadaccesdata_currentyear"
+        if year == today.year
+        else f"downloadaccesdata_year/{year}"
+    )
+    url = f"{RAW_BASE}/{route}/{STATION_TYPE}/{STATION_ID}/{first}/{last}"
+    # Live supplement for the current month; this is the same rawdata export
+    # route family and avoids depending on the lagging yearly spreadsheet.
+    live_url = f"{RAW_BASE}/downloadaccesdata/{STATION_TYPE}/{STATION_ID}/{first}/{last}"
+    return url, live_url, last
+
+
+def fetch_raw_excel(session: requests.Session, url: str) -> bytes:
+    """Download an Excel export without logging response URLs or page contents."""
+    retryable = {429, 500, 502, 503, 504}
+    response = None
+    for attempt in range(3):
+        try:
+            response = session.get(url, timeout=120)
+        except requests.RequestException:
+            if attempt < 2:
+                time.sleep(5 * (attempt + 1))
+                continue
+            raise RuntimeError("Gagal menghubungi endpoint rawdata AWS BMKG.") from None
+        if response.status_code not in retryable or attempt == 2:
+            break
+        time.sleep(5 * (attempt + 1))
+
+    if response is None or response.status_code != 200:
+        code = response.status_code if response is not None else "unknown"
+        raise RuntimeError(f"Unduhan rawdata AWS BMKG gagal: HTTP {code}.")
+    if not response.content.startswith(b"PK"):
+        raise RuntimeError(
+            "Endpoint rawdata tidak mengembalikan file Excel. "
+            "Kemungkinan akses endpoint memerlukan sesi atau sedang ditolak."
+        )
+    return response.content
+
+
+def raw_excel_to_frame(content: bytes) -> pd.DataFrame:
+    """Convert BMKG raw Excel headers to the fields expected by normalize()."""
+    raw = pd.read_excel(io.BytesIO(content), engine="openpyxl")
+    aliases = {
+        "ID Stasiun": "id_station",
+        "id_stasiun": "id_station",
+        "Nama Stasiun": "name_station",
+        "Lattitude": "latt_station",
+        "Latitude": "latt_station",
+        "Longitude": "long_station",
+        "Tanggal": "tanggal",
+    }
+    frame = raw.rename(columns=aliases).copy()
+    if not {"id_station", "tanggal"}.issubset(frame.columns):
+        raise RuntimeError(
+            "File Excel rawdata tidak memuat kolom ID Stasiun dan Tanggal."
+        )
+    frame["id_station"] = frame["id_station"].astype(str).str.strip()
+    frame = frame[frame["id_station"].eq(STATION_ID)].copy()
+    return frame
+
+
+def request_raw_export(
+    session: requests.Session,
+    start: datetime,
+    end: datetime,
+) -> pd.DataFrame:
+    """Download raw Excel by month and return only the recent rolling window."""
+    start = start.astimezone(timezone.utc)
+    end = end.astimezone(timezone.utc)
+    if end <= start:
+        raise ValueError("Waktu akhir harus setelah waktu mulai.")
+
+    today = end.date()
+    months = []
+    year, month = start.year, start.month
+    while (year, month) <= (end.year, end.month):
+        months.append((year, month))
+        month += 1
+        if month == 13:
+            month, year = 1, year + 1
+
+    frames = []
+    for year, month in months:
+        url, live_url, last = raw_month_url(year, month, today)
+        base_content = fetch_raw_excel(session, url)
+        (RAW_DIR / f"aws_{STATION_ID}_{year}-{month:02d}_raw.xlsx").write_bytes(base_content)
+        frames.append(raw_excel_to_frame(base_content))
+
+        if (year, month) == (today.year, today.month):
+            live_content = fetch_raw_excel(session, live_url)
+            (RAW_DIR / f"aws_{STATION_ID}_{year}-{month:02d}_recent.xlsx").write_bytes(live_content)
+            frames.append(raw_excel_to_frame(live_content))
+
+    if not frames:
+        raise RuntimeError("Endpoint rawdata tidak menghasilkan file untuk rentang ini.")
+
+    combined = pd.concat(frames, ignore_index=True, sort=False)
+    combined["_time_utc"] = pd.to_datetime(combined["tanggal"], utc=True, errors="coerce")
+    combined = combined.dropna(subset=["_time_utc"])
+    combined = (
+        combined.drop_duplicates(["id_station", "_time_utc"], keep="last")
+        .sort_values("_time_utc")
+    )
+    combined = combined[combined["_time_utc"].between(start, end)].copy()
+    return combined.drop(columns=["_time_utc"]).reset_index(drop=True)
 
 
 def flatten_payload(payload: Any) -> list[dict[str, Any]]:
@@ -411,18 +519,26 @@ def main() -> int:
     )
 
     try:
-        token = get_token(session)
         start, end = utc_request_window()
 
-        payload = request_data(session, token, start, end)
+        raw_export = request_raw_export(session, start, end)
+        if raw_export.empty:
+            raise RuntimeError(
+                f"Tidak ada observasi {STATION_ID} pada rentang rolling terakhir."
+            )
 
-        RAW_JSON_PATH.write_text(
-            json.dumps(payload, indent=2, ensure_ascii=False, default=str),
+        RAW_EXPORT_PATH.write_text(
+            raw_export.to_csv(index=False),
             encoding="utf-8",
         )
 
-        records = flatten_payload(payload)
-        df = normalize(records)
+        df = normalize(raw_export.to_dict(orient="records"))
+        observed = pd.to_datetime(df["datetime_utc"], utc=True, errors="coerce")
+        df = df.loc[observed.between(start, end)].copy()
+        if df.empty:
+            raise RuntimeError(
+                f"Tidak ada observasi valid {STATION_ID} pada rentang rolling terakhir."
+            )
         df.to_csv(CSV_PATH, index=False)
 
         latest = df.iloc[-1]
