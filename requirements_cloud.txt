@@ -4,3 +4,4 @@ scikit-learn==1.9.0
 joblib==1.5.3
 tensorflow==2.20.0
 requests==2.32.5
+openpyxl==3.1.5
